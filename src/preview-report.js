@@ -514,18 +514,17 @@ function formatPreviewSheet(sheet) {
   console.log('🎨 Formatting preview sheet...');
   
   try {
-    // Auto-resize most columns
-    sheet.autoResizeColumns(1, 1); // Column A (Group names)
-    sheet.autoResizeColumns(6, 5); // Columns F-J (sections 3-5)
-    
-    // Set specific column widths per feedback
-    sheet.setColumnWidth(2, 85); // Breeze Export Count - narrower
-    sheet.setColumnWidth(3, 85); // GCG Members Tab Count - narrower  
-    sheet.setColumnWidth(4, 85); // Inactive Count - narrower
-    sheet.setColumnWidth(5, 45); // Buffer column - specific width
-    
-    // Auto-resize the remaining columns
-    sheet.autoResizeColumns(6, 5); // F-J for sections 3-5
+    // Set column widths explicitly - NO AUTO-RESIZE
+    sheet.setColumnWidth(1, 200); // Column A (Group names) - fixed width
+    sheet.setColumnWidth(2, 85);  // Breeze Export Count - narrower
+    sheet.setColumnWidth(3, 85);  // GCG Members Tab Count - narrower  
+    sheet.setColumnWidth(4, 85);  // Inactive Count - narrower
+    sheet.setColumnWidth(5, 45);  // Buffer column - specific width
+    sheet.setColumnWidth(6, 100); // Column F - fixed width per feedback
+    sheet.setColumnWidth(7, 100); // Column G 
+    sheet.setColumnWidth(8, 100); // Column H
+    sheet.setColumnWidth(9, 120); // Column I
+    sheet.setColumnWidth(10, 180); // Column J
     
     console.log('✅ Preview sheet formatted successfully');
     
