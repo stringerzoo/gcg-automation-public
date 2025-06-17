@@ -823,3 +823,253 @@ function findHeaderRow(data) {
   
   return -1;
 }
+
+/**
+ * Debug functions to test family logic step by step
+ */
+
+/**
+ * Test the family logic processing step by step
+ */
+function testFamilyLogicProcessing() {
+  console.log('🧪 Testing family logic processing step by step...');
+  
+  try {
+    // Step 1: Get enhanced data with family info
+    console.log('📊 Step 1: Getting enhanced data with family info...');
+    const exportData = parseRealGCGDataWithFamilyInfo();
+    console.log(`✅ Enhanced data loaded: ${exportData.activeMembers.length} active members`);
+    
+    // Step 2: Check if we have family data
+    const withFamilyData = exportData.activeMembers.filter(m => m.familyId).length;
+    console.log(`👨‍👩‍👧‍👦 Members with family data: ${withFamilyData}/${exportData.activeMembers.length}`);
+    
+    // Step 3: Test family representative calculation
+    console.log('📊 Step 2: Testing family representative calculation...');
+    const familyReps = calculateFamilyRepresentatives(exportData);
+    console.log(`✅ Family representatives calculated: ${familyReps.length} representatives`);
+    
+    // Step 4: Test current "Not in GCG" reading
+    console.log('📊 Step 3: Testing current "Not in GCG" tab reading...');
+    const config = getConfig();
+    const ss = SpreadsheetApp.openById(config.SHEET_ID);
+    const currentNotInGCG = getCurrentNotInGCGMembers(ss);
+    console.log(`✅ Current "Not in GCG" members: ${currentNotInGCG.length}`);
+    
+    // Step 5: Test full family logic
+    console.log('📊 Step 4: Testing full family logic...');
+    const familyChanges = calculateNotInGCGChangesWithFamilyLogic(exportData);
+    console.log(`✅ Family logic results:`);
+    console.log(`   ➕ Additions: ${familyChanges.additions.length}`);
+    console.log(`   ➖ Deletions: ${familyChanges.deletions.length}`);
+    console.log(`   👨‍👩‍👧‍👦 Family groups processed: ${familyChanges.familyGroupsProcessed}`);
+    
+    // Step 6: Show sample results
+    if (familyChanges.additions.length > 0) {
+      console.log('📋 Sample additions:');
+      familyChanges.additions.slice(0, 5).forEach(person => {
+        console.log(`   ${person.firstName} ${person.lastName} (Family: ${person.familyId}, Role: ${person.familyRole})`);
+      });
+    }
+    
+    if (familyChanges.deletions.length > 0) {
+      console.log('📋 Sample deletions:');
+      familyChanges.deletions.slice(0, 5).forEach(person => {
+        console.log(`   ${person.firstName} ${person.lastName} (Family: ${person.familyId}, Role: ${person.familyRole})`);
+      });
+    }
+    
+    return familyChanges;
+    
+  } catch (error) {
+    console.error('❌ Family logic test failed:', error.message);
+    console.error('Stack trace:', error.stack);
+    throw error;
+  }
+}
+
+/**
+ * Debug the Active Members family data parsing
+ */
+function debugActiveMembersFamilyData() {
+  console.log('🔍 Debugging Active Members family data parsing...');
+  
+  try {
+    // Re-read the Active Members file to inspect family data
+    const activeMembersFile = findLatestFile('ACTIVE_MEMBERS');
+    const spreadsheet = SpreadsheetApp.openById(activeMembersFile.getId());
+    const dataSheet = spreadsheet.getSheets()[0];
+    const data = dataSheet.getDataRange().getValues();
+    
+    if (data.length === 0) {
+      console.error('❌ No data in Active Members sheet');
+      return;
+    }
+    
+    // Show headers to verify family columns exist
+    const headers = data[0];
+    console.log('📋 Active Members headers:');
+    headers.forEach((header, index) => {
+      if (header && header.toString().toLowerCase().includes('family')) {
+        console.log(`   Column ${index}: ${header}`);
+      }
+    });
+    
+    // Find family-related columns
+    const columnMap = {
+      personId: findColumnIndex(headers, 'Breeze ID'),
+      firstName: findColumnIndex(headers, 'First Name'),
+      lastName: findColumnIndex(headers, 'Last Name'),
+      familyId: findColumnIndex(headers, 'Family'),
+      familyRole: findColumnIndex(headers, 'Family Role'),
+      membershipStartDate: findColumnIndex(headers, 'Membership Start Date')
+    };
+    
+    console.log('🔍 Column mapping:');
+    Object.entries(columnMap).forEach(([field, index]) => {
+      console.log(`   ${field}: ${index >= 0 ? `Column ${index} (${headers[index]})` : 'NOT FOUND'}`);
+    });
+    
+    // Show sample family data
+    console.log('📋 Sample family data (first 10 rows):');
+    for (let i = 1; i <= Math.min(10, data.length - 1); i++) {
+      const row = data[i];
+      const personId = row[columnMap.personId];
+      const firstName = row[columnMap.firstName];
+      const lastName = row[columnMap.lastName];
+      const familyId = row[columnMap.familyId];
+      const familyRole = row[columnMap.familyRole];
+      
+      if (personId && firstName && lastName) {
+        console.log(`   ${firstName} ${lastName} (ID: ${personId}) - Family: ${familyId || 'null'}, Role: ${familyRole || 'null'}`);
+      }
+    }
+    
+    // Count family data coverage
+    let withFamilyId = 0;
+    let withFamilyRole = 0;
+    
+    for (let i = 1; i < data.length; i++) {
+      const row = data[i];
+      if (row[columnMap.familyId]) withFamilyId++;
+      if (row[columnMap.familyRole]) withFamilyRole++;
+    }
+    
+    console.log(`📊 Family data coverage:`);
+    console.log(`   With Family ID: ${withFamilyId}/${data.length - 1} (${(withFamilyId/(data.length-1)*100).toFixed(1)}%)`);
+    console.log(`   With Family Role: ${withFamilyRole}/${data.length - 1} (${(withFamilyRole/(data.length-1)*100).toFixed(1)}%)`);
+    
+    return {
+      totalRows: data.length - 1,
+      withFamilyId: withFamilyId,
+      withFamilyRole: withFamilyRole,
+      columnMap: columnMap
+    };
+    
+  } catch (error) {
+    console.error('❌ Active Members family data debug failed:', error.message);
+    throw error;
+  }
+}
+
+/**
+ * Test the current Not in GCG tab reading
+ */
+function debugCurrentNotInGCGTab() {
+  console.log('🔍 Debugging current "Not in GCG" tab reading...');
+  
+  try {
+    const config = getConfig();
+    const ss = SpreadsheetApp.openById(config.SHEET_ID);
+    const sheet = ss.getSheetByName('Not in a GCG');
+    
+    if (!sheet) {
+      console.error('❌ "Not in a GCG" sheet not found');
+      return;
+    }
+    
+    const data = sheet.getDataRange().getValues();
+    console.log(`📊 Sheet has ${data.length} rows`);
+    
+    // Show headers (should be in row 3)
+    if (data.length >= 3) {
+      const headers = data[2]; // Row 3 (index 2)
+      console.log('📋 Headers in row 3:');
+      headers.forEach((header, index) => {
+        if (header) {
+          console.log(`   Column ${index}: ${header}`);
+        }
+      });
+      
+      // Find Person ID column
+      const personIdCol = findColumnIndex(headers, 'Person ID');
+      console.log(`🔍 Person ID column: ${personIdCol >= 0 ? personIdCol : 'NOT FOUND'}`);
+      
+      // Show sample data
+      if (data.length > 3) {
+        console.log('📋 Sample data (first 5 rows):');
+        for (let i = 3; i < Math.min(8, data.length); i++) {
+          const row = data[i];
+          if (row[personIdCol]) {
+            console.log(`   Row ${i+1}: ${row[personIdCol]} - ${row[1] || ''} ${row[2] || ''}`);
+          }
+        }
+      }
+    }
+    
+    const currentMembers = getCurrentNotInGCGMembers(ss);
+    console.log(`✅ Successfully read ${currentMembers.length} current "Not in GCG" members`);
+    
+    return currentMembers;
+    
+  } catch (error) {
+    console.error('❌ Current "Not in GCG" tab debug failed:', error.message);
+    throw error;
+  }
+}
+
+/**
+ * Simple test to see what the preview report is actually calling
+ */
+function debugPreviewReportDataFlow() {
+  console.log('🔍 Debugging preview report data flow...');
+  
+  try {
+    // Test what parseRealGCGDataWithGCGMembers returns
+    console.log('📊 Testing standard data parsing...');
+    const standardData = parseRealGCGDataWithGCGMembers();
+    console.log(`✅ Standard data: ${standardData.activeMembers.length} active members`);
+    
+    // Test if family enhancement is working
+    console.log('📊 Testing family data enhancement...');
+    const familyData = parseRealGCGDataWithFamilyInfo();
+    console.log(`✅ Family data: ${familyData.activeMembers.length} active members`);
+    
+    const withFamilyInfo = familyData.activeMembers.filter(m => m.familyId).length;
+    console.log(`👨‍👩‍👧‍👦 Members with family info: ${withFamilyInfo}/${familyData.activeMembers.length}`);
+    
+    // Test what calculateNotInGCGChanges returns (this is what preview calls)
+    console.log('📊 Testing calculateNotInGCGChanges (preview report function)...');
+    const previewChanges = calculateNotInGCGChanges(standardData);
+    console.log(`✅ Preview changes: ${previewChanges.additions.length} additions, ${previewChanges.deletions.length} deletions`);
+    
+    // Test the enhanced family version
+    console.log('📊 Testing enhanced family logic...');
+    const familyChanges = calculateNotInGCGChangesWithFamilyLogic(familyData);
+    console.log(`✅ Family changes: ${familyChanges.additions.length} additions, ${familyChanges.deletions.length} deletions`);
+    
+    console.log('\n🔍 COMPARISON:');
+    console.log(`Standard approach: ${previewChanges.additions.length} additions`);
+    console.log(`Family approach: ${familyChanges.additions.length} additions`);
+    console.log(`Difference: ${Math.abs(previewChanges.additions.length - familyChanges.additions.length)}`);
+    
+    return {
+      standard: previewChanges,
+      family: familyChanges
+    };
+    
+  } catch (error) {
+    console.error('❌ Preview report data flow debug failed:', error.message);
+    throw error;
+  }
+}
