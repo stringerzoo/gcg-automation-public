@@ -44,7 +44,8 @@ function generatePreviewReport() {
     // Format the sheet for readability
     formatPreviewSheet(previewSheet);
     
-    // Activate the preview sheet to keep focus on it
+    // Activate the preview sheet to keep focus on it - try multiple approaches
+    ss.setActiveSheet(previewSheet);
     previewSheet.activate();
     
     console.log('✅ Preview report generated successfully');
@@ -65,10 +66,17 @@ function addReportHeader(sheet) {
   const now = new Date();
   const timestamp = now.toLocaleString();
   
-  sheet.getRange('A1').setValue(`Breeze Update Preview Report - ${timestamp}`);
+  // Title in merged cells A1:I1
+  sheet.getRange('A1:I1').merge();
+  sheet.getRange('A1').setValue('Breeze Update Preview Report');
   sheet.getRange('A1').setFontSize(14).setFontWeight('bold');
-  sheet.getRange('A1:J1').merge();
   sheet.getRange('A1').setBackground('#1976d2').setFontColor('white');
+  
+  // Timestamp in J1
+  sheet.getRange('J1').setValue(timestamp);
+  sheet.getRange('J1').setFontSize(10).setFontWeight('normal');
+  sheet.getRange('J1').setBackground('#1976d2').setFontColor('white');
+  sheet.getRange('J1').setHorizontalAlignment('right');
 }
 
 /**
