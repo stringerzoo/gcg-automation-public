@@ -1,6 +1,7 @@
 /**
  * Preview Report System for GCG Automation
  * Generates comprehensive preview before applying updates
+ * Updated with formatting improvements
  */
 
 /**
@@ -63,12 +64,12 @@ function addReportHeader(sheet) {
   
   sheet.getRange('A1').setValue(`Breeze Update Preview Report - ${timestamp}`);
   sheet.getRange('A1').setFontSize(14).setFontWeight('bold');
-  sheet.getRange('A1:I1').merge();
+  sheet.getRange('A1:J1').merge();
   sheet.getRange('A1').setBackground('#1976d2').setFontColor('white');
 }
 
 /**
- * Build Section 1: GCG Summary (A2:D40) - Added inactive count column
+ * Build Section 1: GCG Summary (A2:E40) - Removed hyperlinks, updated formatting
  * Shows truth data count vs current sheet count vs inactive count for each group
  */
 function buildGCGSummaryReport(sheet, exportData, changes) {
@@ -78,14 +79,15 @@ function buildGCGSummaryReport(sheet, exportData, changes) {
   const ss = SpreadsheetApp.openById(config.SHEET_ID);
   const allCurrentMembers = getGCGMembersWithPersonId(ss); // Include inactive
   
-  // Headers (row 2 now) - Added column D
+  // Headers (row 2) - Removed hyperlinks per feedback
   sheet.getRange('A2').setValue('GCG Name');
   sheet.getRange('B2').setValue('Breeze Export Count');
   sheet.getRange('C2').setValue('GCG Members Tab Count');
   sheet.getRange('D2').setValue('Inactive Count');
   
-  // Make headers bold
+  // Make headers bold and wrap text for B2:D2
   sheet.getRange('A2:D2').setFontWeight('bold');
+  sheet.getRange('B2:D2').setWrap(true);
   
   // Sort groups alphabetically by leader name
   const groups = exportData.groups.sort((a, b) => a.leader.localeCompare(b.leader));
@@ -102,13 +104,8 @@ function buildGCGSummaryReport(sheet, exportData, changes) {
     const activeGroupMembers = allGroupMembers.filter(m => !isMarkedInactive(m));
     const inactiveGroupMembers = allGroupMembers.filter(m => isMarkedInactive(m));
     
-    // Add hyperlink to section 2 for group name
-    const groupSectionRow = findGroupInSection2(group.displayName, groups);
-    if (groupSectionRow > 0) {
-      sheet.getRange(row, 1).setFormula(`=HYPERLINK("#A${groupSectionRow}", "${group.displayName}")`);
-    } else {
-      sheet.getRange(row, 1).setValue(group.displayName);
-    }
+    // Add group name without hyperlinks
+    sheet.getRange(row, 1).setValue(group.displayName);
     
     sheet.getRange(row, 2).setValue(group.memberCount); // Breeze export count
     sheet.getRange(row, 3).setValue(activeGroupMembers.length); // Active in sheet
@@ -119,9 +116,9 @@ function buildGCGSummaryReport(sheet, exportData, changes) {
       sheet.getRange(row, 1, 1, 4).setBackground('#fff2cc'); // Light yellow
     }
     
-    // Special highlighting for groups with inactive members
+    // Special highlighting for groups with inactive members - changed to light orange
     if (inactiveGroupMembers.length > 0) {
-      sheet.getRange(row, 4).setBackground('#ffcccc'); // Light red for inactive count
+      sheet.getRange(row, 4).setBackground('#ffe0b3'); // Light orange for inactive count
     }
   });
   
@@ -129,25 +126,7 @@ function buildGCGSummaryReport(sheet, exportData, changes) {
 }
 
 /**
- * Helper function to find group position in section 2
- */
-function findGroupInSection2(groupName, groups) {
-  // Section 2 starts at row 41, find this group's position
-  let currentRow = 41;
-  
-  for (let i = 0; i < groups.length; i++) {
-    if (normalizeGroupName(groups[i].displayName) === normalizeGroupName(groupName)) {
-      return currentRow;
-    }
-    // Each group takes approximately 6 rows (header + additions + deletions + spacing)
-    currentRow += 6;
-  }
-  
-  return 0; // Not found
-}
-
-/**
- * Build Section 2: Group-by-Group Report (A41+) - Added inactive section
+ * Build Section 2: Group-by-Group Report (A41+) - Updated inactive section color
  * Shows additions, deletions, and inactive members for each group with changes
  */
 function buildGroupByGroupReport(sheet, exportData, changes) {
@@ -228,10 +207,10 @@ function buildGroupByGroupReport(sheet, exportData, changes) {
       currentRow++;
     }
     
-    // NEW: Inactive section
+    // Inactive section - updated to light orange background
     sheet.getRange(currentRow, 1).setValue('Currently Listed as Inactive');
     sheet.getRange(currentRow, 1).setFontWeight('bold');
-    sheet.getRange(currentRow, 1).setBackground('#ffcccc'); // Light red
+    sheet.getRange(currentRow, 1).setBackground('#ffe0b3'); // Light orange (was light red)
     currentRow++;
     
     if (groupChanges.inactive.length > 0) {
@@ -327,7 +306,7 @@ function findGroupSpecificChangesWithInactive(group, changes, exportData, allCur
 }
 
 /**
- * Build Section 3: Statistics (E2:G5) - shifted down by 1 row and moved data to column G
+ * Build Section 3: Statistics (F2:G5) - Updated formatting without vertical borders
  * Shows overall statistics about membership with clean counts
  */
 function buildStatsReport(sheet, exportData) {
@@ -340,133 +319,100 @@ function buildStatsReport(sheet, exportData) {
   const activeNotInGCGCount = originalActiveCount - activeInGCGCount;
   const gcgMembersNotInActive = exportData.summary.syntheticMembers || 0;
   
-  // Clean statistics - labels in E, data in G (F is buffer)
-  sheet.getRange('E2').setValue('Active Members:');
+  // Clean statistics - labels in F, data in G
+  sheet.getRange('F2').setValue('Active Members:');
   sheet.getRange('G2').setValue(originalActiveCount);
   
-  sheet.getRange('E3').setValue('Active Members in GCGs:');
+  sheet.getRange('F3').setValue('Active Members in GCGs:');
   sheet.getRange('G3').setValue(activeInGCGCount);
   
-  sheet.getRange('E4').setValue('Active Members not in GCGs:');
+  sheet.getRange('F4').setValue('Active Members not in GCGs:');
   sheet.getRange('G4').setValue(activeNotInGCGCount);
   
-  sheet.getRange('E5').setValue('GCG Members not in Active list:');
+  sheet.getRange('F5').setValue('GCG Members not in Active list:');
   sheet.getRange('G5').setValue(gcgMembersNotInActive);
   
   // Make labels bold
-  sheet.getRange('E2:E5').setFontWeight('bold');
+  sheet.getRange('F2:F5').setFontWeight('bold');
   
-  // Highlight the data inconsistency if present
-  if (gcgMembersNotInActive > 0) {
-    sheet.getRange('E5:G5').setBackground('#fff2cc'); // Light yellow warning
-  }
+  // Add borders but NO background for the fourth line per feedback
+  sheet.getRange('F2:G4').setBorder(true, true, true, true, true, true);
+  sheet.getRange('F5:G5').setBorder(true, true, true, true, false, false); // No internal borders for last row
   
   console.log('✅ Built statistics section with clean counts');
 }
 
 /**
- * Build Section 4: Not in GCG Updates (E10+)
+ * Build Section 4: Not in GCG Updates (F10+) - Updated header formatting
  * Shows proposed updates to the "Not in a GCG" tab
  */
 function buildNotInGCGReport(sheet, exportData) {
   console.log('📝 Building Not in GCG section...');
   
-  // Header
-  sheet.getRange('E10').setValue('Proposed Updates to Active Members Not in a GCG');
-  sheet.getRange('E10').setFontWeight('bold');
-  sheet.getRange('E10').setBackground('#f3e5f5'); // Light purple
+  // Header - extended to column J per feedback
+  sheet.getRange('F10:J10').merge();
+  sheet.getRange('F10').setValue('Proposed Updates to Active Members Not in a GCG');
+  sheet.getRange('F10').setFontWeight('bold');
+  sheet.getRange('F10').setBackground('#f3e5f5'); // Light purple
   
-  // Column headers
-  sheet.getRange('E11').setValue('Person ID');
-  sheet.getRange('F11').setValue('First Name');
-  sheet.getRange('G11').setValue('Last Name');
-  sheet.getRange('H11').setValue('Family ID');
-  sheet.getRange('I11').setValue('Family Role');
-  sheet.getRange('E11:I11').setFontWeight('bold');
+  // Column headers - no background color, black text per feedback
+  sheet.getRange('F11').setValue('Person ID');
+  sheet.getRange('G11').setValue('First Name');
+  sheet.getRange('H11').setValue('Last Name');
+  sheet.getRange('I11').setValue('Family ID');
+  sheet.getRange('J11').setValue('Family Role');
+  sheet.getRange('F11:J11').setFontWeight('bold');
+  sheet.getRange('F11:J11').setBackground(null); // Remove background
+  sheet.getRange('F11:J11').setFontColor('black'); // Ensure black text
   
   let currentRow = 12;
   
   // Calculate Not in GCG changes
   const notInGCGChanges = calculateNotInGCGChanges(exportData);
   
-  // Additions section
-  sheet.getRange(currentRow, 5).setValue('Additions');
-  sheet.getRange(currentRow, 5).setFontWeight('bold');
+  // Additions section - no background color per feedback
+  sheet.getRange(currentRow, 6).setValue('Additions');
+  sheet.getRange(currentRow, 6).setFontWeight('bold');
+  sheet.getRange(currentRow, 6).setBackground(null); // Remove background
+  sheet.getRange(currentRow, 6).setFontColor('black'); // Ensure black text
   currentRow++;
   
   if (notInGCGChanges.additions.length > 0) {
     notInGCGChanges.additions.forEach(person => {
-      sheet.getRange(currentRow, 5).setValue(person.personId);
-      sheet.getRange(currentRow, 6).setValue(person.firstName);
-      sheet.getRange(currentRow, 7).setValue(person.lastName);
-      sheet.getRange(currentRow, 8).setValue(person.familyId || 'null');
-      sheet.getRange(currentRow, 9).setValue(person.familyRole || 'null');
+      sheet.getRange(currentRow, 6).setValue(person.personId);
+      sheet.getRange(currentRow, 7).setValue(person.firstName);
+      sheet.getRange(currentRow, 8).setValue(person.lastName);
+      sheet.getRange(currentRow, 9).setValue(person.familyId || 'null');
+      sheet.getRange(currentRow, 10).setValue(person.familyRole || 'null');
       currentRow++;
     });
   } else {
-    sheet.getRange(currentRow, 5).setValue('None');
+    sheet.getRange(currentRow, 6).setValue('None');
     currentRow++;
   }
   
-  // Deletions section
-  sheet.getRange(currentRow, 5).setValue('Deletions');
-  sheet.getRange(currentRow, 5).setFontWeight('bold');
+  // Deletions section - no background color per feedback
+  sheet.getRange(currentRow, 6).setValue('Deletions');
+  sheet.getRange(currentRow, 6).setFontWeight('bold');
+  sheet.getRange(currentRow, 6).setBackground(null); // Remove background
+  sheet.getRange(currentRow, 6).setFontColor('black'); // Ensure black text
   currentRow++;
   
   if (notInGCGChanges.deletions.length > 0) {
     notInGCGChanges.deletions.forEach(person => {
-      sheet.getRange(currentRow, 5).setValue(person.personId);
-      sheet.getRange(currentRow, 6).setValue(person.firstName);
-      sheet.getRange(currentRow, 7).setValue(person.lastName);
-      sheet.getRange(currentRow, 8).setValue(person.familyId || 'null');
-      sheet.getRange(currentRow, 9).setValue(person.familyRole || 'null');
+      sheet.getRange(currentRow, 6).setValue(person.personId);
+      sheet.getRange(currentRow, 7).setValue(person.firstName);
+      sheet.getRange(currentRow, 8).setValue(person.lastName);
+      sheet.getRange(currentRow, 9).setValue(person.familyId || 'null');
+      sheet.getRange(currentRow, 10).setValue(person.familyRole || 'null');
       currentRow++;
     });
   } else {
-    sheet.getRange(currentRow, 5).setValue('None');
+    sheet.getRange(currentRow, 6).setValue('None');
     currentRow++;
   }
   
   console.log(`✅ Built Not in GCG section with ${notInGCGChanges.additions.length} additions and ${notInGCGChanges.deletions.length} deletions`);
-}
-
-/**
- * Helper function to find group-specific changes
- * @param {Object} group - Group object from export data
- * @param {Object} changes - Overall changes object
- * @param {Object} exportData - Full export data
- * @returns {Object} Group-specific additions and deletions
- */
-function findGroupSpecificChanges(group, changes, exportData) {
-  const groupAdditions = [];
-  const groupDeletions = [];
-  
-  // Find additions for this group
-  changes.additions.forEach(change => {
-    if (normalizeGroupName(change.member.gcgStatus.groupName) === normalizeGroupName(group.displayName)) {
-      groupAdditions.push({
-        personId: change.member.personId,
-        firstName: change.member.firstName,
-        lastName: change.member.lastName
-      });
-    }
-  });
-  
-  // Find deletions for this group
-  changes.removals.forEach(change => {
-    if (normalizeGroupName(change.member.group) === normalizeGroupName(group.displayName)) {
-      groupDeletions.push({
-        personId: change.member.personId,
-        firstName: change.member.firstName,
-        lastName: change.member.lastName
-      });
-    }
-  });
-  
-  return {
-    additions: groupAdditions,
-    deletions: groupDeletions
-  };
 }
 
 /**
@@ -497,7 +443,7 @@ function calculateNotInGCGChanges(exportData) {
 }
 
 /**
- * Build Section 5: Data Inconsistencies (E26+) - shifted down by 1 row with buffer and improved formatting
+ * Build Section 5: Data Inconsistencies (F26+) - Updated formatting and instructions
  * Shows GCG members who aren't in the Active Members list
  */
 function buildDataInconsistenciesReport(sheet, exportData) {
@@ -510,52 +456,52 @@ function buildDataInconsistenciesReport(sheet, exportData) {
   
   let currentRow = 26; // Added 1-row buffer from Section 4
   
-  // Section header with improved highlighting
-  sheet.getRange(`E${currentRow}:I${currentRow}`).merge();
-  sheet.getRange(`E${currentRow}`).setValue('Data Inconsistencies - Action Required');
-  sheet.getRange(`E${currentRow}`).setFontWeight('bold');
-  sheet.getRange(`E${currentRow}`).setBackground('#ffcdd2'); // Light red
+  // Section header - extended highlighting to column J per feedback
+  sheet.getRange(`F${currentRow}:J${currentRow}`).merge();
+  sheet.getRange(`F${currentRow}`).setValue('Data Inconsistencies - Action Required');
+  sheet.getRange(`F${currentRow}`).setFontWeight('bold');
+  sheet.getRange(`F${currentRow}`).setBackground('#ffcdd2'); // Light red
   currentRow++;
   
   // Subsection header
-  sheet.getRange(`E${currentRow}`).setValue('GCG Members Not in Active Members List');
-  sheet.getRange(`E${currentRow}`).setFontWeight('bold');
+  sheet.getRange(`F${currentRow}`).setValue('GCG Members Not in Active Members List');
+  sheet.getRange(`F${currentRow}`).setFontWeight('bold');
   currentRow++;
   
   // Column headers
-  sheet.getRange(`E${currentRow}`).setValue('Person ID');
-  sheet.getRange(`F${currentRow}`).setValue('First Name');
-  sheet.getRange(`G${currentRow}`).setValue('Last Name');
-  sheet.getRange(`H${currentRow}`).setValue('Current GCG');
-  sheet.getRange(`I${currentRow}`).setValue('Action Needed');
-  sheet.getRange(`E${currentRow}:I${currentRow}`).setFontWeight('bold');
+  sheet.getRange(`F${currentRow}`).setValue('Person ID');
+  sheet.getRange(`G${currentRow}`).setValue('First Name');
+  sheet.getRange(`H${currentRow}`).setValue('Last Name');
+  sheet.getRange(`I${currentRow}`).setValue('Current GCG');
+  sheet.getRange(`J${currentRow}`).setValue('Action Needed');
+  sheet.getRange(`F${currentRow}:J${currentRow}`).setFontWeight('bold');
   currentRow++;
   
   // List each inconsistent member
   exportData.missingFromActive.forEach(person => {
-    sheet.getRange(`E${currentRow}`).setValue(person.personId);
-    sheet.getRange(`F${currentRow}`).setValue(person.firstName);
-    sheet.getRange(`G${currentRow}`).setValue(person.lastName);
-    sheet.getRange(`H${currentRow}`).setValue(person.groupName);
-    sheet.getRange(`I${currentRow}`).setValue('Add to Active Members OR Remove from GCG');
+    sheet.getRange(`F${currentRow}`).setValue(person.personId);
+    sheet.getRange(`G${currentRow}`).setValue(person.firstName);
+    sheet.getRange(`H${currentRow}`).setValue(person.lastName);
+    sheet.getRange(`I${currentRow}`).setValue(person.groupName);
+    sheet.getRange(`J${currentRow}`).setValue('Add to Active Members OR Remove from GCG');
     currentRow++;
   });
   
-  // Add instructions with improved step 4
+  // Add instructions with improved step 4 per feedback
   currentRow++;
-  sheet.getRange(`E${currentRow}`).setValue('Instructions:');
-  sheet.getRange(`E${currentRow}`).setFontWeight('bold');
+  sheet.getRange(`F${currentRow}`).setValue('Instructions:');
+  sheet.getRange(`F${currentRow}`).setFontWeight('bold');
   currentRow++;
   
-  sheet.getRange(`E${currentRow}`).setValue('1. Review each person listed above');
+  sheet.getRange(`F${currentRow}`).setValue('1. Review each person listed above');
   currentRow++;
-  sheet.getRange(`E${currentRow}`).setValue('2. If they should be active: Add them to the "Members - Active" tag in Breeze');
+  sheet.getRange(`F${currentRow}`).setValue('2. If they should be active: Add them to the "Members - Active" tag in Breeze');
   currentRow++;
-  sheet.getRange(`E${currentRow}`).setValue('3. If they are inactive: Remove them from their GCG tag in Breeze');
+  sheet.getRange(`F${currentRow}`).setValue('3. If they are inactive: Remove them from their GCG tag in Breeze');
   currentRow++;
-  sheet.getRange(`E${currentRow}`).setValue('4. If they are members-in-process: Verify their membership status in Breeze and update as needed');
+  sheet.getRange(`F${currentRow}`).setValue('4. If they are members-in-process: Verify their membership status in Breeze and update as needed');
   currentRow++;
-  sheet.getRange(`E${currentRow}`).setValue('5. Re-export and run this report again to verify fixes');
+  sheet.getRange(`F${currentRow}`).setValue('5. Re-export and run this report again to verify fixes');
   
   console.log(`✅ Built data inconsistencies section with ${exportData.missingFromActive.length} issues`);
 }
@@ -568,27 +514,18 @@ function formatPreviewSheet(sheet) {
   console.log('🎨 Formatting preview sheet...');
   
   try {
-    // Auto-resize columns
-    sheet.autoResizeColumns(1, 10);
+    // Auto-resize most columns
+    sheet.autoResizeColumns(1, 1); // Column A (Group names)
+    sheet.autoResizeColumns(6, 5); // Columns F-J (sections 3-5)
     
-    // Format main headers (shifted down by 1 row and updated for new column)
-    sheet.getRange('A2:D2').setBackground('#4CAF50').setFontColor('white');
-    sheet.getRange('E2:G5').setBorder(true, true, true, true, true, true);
-    sheet.getRange('E11:I12').setBackground('#2196F3').setFontColor('white');
+    // Set specific column widths per feedback
+    sheet.setColumnWidth(2, 85); // Breeze Export Count - narrower
+    sheet.setColumnWidth(3, 85); // GCG Members Tab Count - narrower  
+    sheet.setColumnWidth(4, 85); // Inactive Count - narrower
+    sheet.setColumnWidth(5, 45); // Buffer column - specific width
     
-    // Set column widths for better readability (updated for new column D)
-    sheet.setColumnWidth(1, 200); // Group names
-    sheet.setColumnWidth(2, 140); // Breeze export count
-    sheet.setColumnWidth(3, 160); // GCG members tab count (active)
-    sheet.setColumnWidth(4, 120); // Inactive count
-    sheet.setColumnWidth(5, 120); // Person ID
-    sheet.setColumnWidth(6, 100); // First name
-    sheet.setColumnWidth(7, 100); // Last name
-    sheet.setColumnWidth(8, 180); // Group name / Family ID / Reason
-    sheet.setColumnWidth(9, 200); // Action needed / Family Role
-    
-    // Don't freeze rows per feedback
-    // sheet.setFrozenRows(1); - REMOVED
+    // Auto-resize the remaining columns
+    sheet.autoResizeColumns(6, 5); // F-J for sections 3-5
     
     console.log('✅ Preview sheet formatted successfully');
     
