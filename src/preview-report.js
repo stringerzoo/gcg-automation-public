@@ -12,8 +12,8 @@ function generatePreviewReport() {
   console.log('📊 Generating comprehensive preview report...');
   
   try {
-    // Get the latest data and changes
-    const exportData = parseRealGCGDataWithGCGMembers();
+    // Get the latest data and changes - USE FAMILY-ENHANCED VERSION
+    const exportData = parseRealGCGDataWithFamilyInfo();
     const changes = fixedCompareWithInactiveFiltering(exportData);
     
     // Create preview sheet
