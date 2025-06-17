@@ -1,7 +1,440 @@
 /**
- * Comparison Engine for GCG Automation (Production Version)
- * Core logic for comparing export data with current Google Sheet
+ * Enhanced Comparison Engine for GCG Automation - Family Logic Implementation
+ * Core logic for comparing export data with current Google Sheet including family grouping
  */
+
+/**
+ * FAMILY ROLE PRIORITY CONSTANTS
+ * Based on Breeze family role hierarchy
+ */
+const FAMILY_ROLE_PRIORITY = {
+  'Head of Household': 1,
+  'Spouse': 2,
+  'Adult': 3,
+  'Child': 4,
+  'Unassigned': 5
+};
+
+/**
+ * Get priority score for family role (lower number = higher priority)
+ * @param {string} familyRole - Role like 'Head of Household', 'Spouse', etc.
+ * @returns {number} Priority score
+ */
+function getFamilyRolePriority(familyRole) {
+  if (!familyRole) return 99; // No role = lowest priority
+  return FAMILY_ROLE_PRIORITY[familyRole] || 99;
+}
+
+/**
+ * Enhanced function to calculate Not in GCG changes with proper family logic
+ * @param {Object} exportData - Full export data with active members
+ * @returns {Object} Additions and deletions for "Not in GCG" tab
+ */
+function calculateNotInGCGChangesWithFamilyLogic(exportData) {
+  console.log('👨‍👩‍👧‍👦 Calculating Not in GCG changes with family logic...');
+  
+  try {
+    // Get current "Not in GCG" tab data
+    const config = getConfig();
+    const ss = SpreadsheetApp.openById(config.SHEET_ID);
+    const currentNotInGCG = getCurrentNotInGCGMembers(ss);
+    
+    // Find people who SHOULD be in "Not in GCG" (with family representatives)
+    const shouldBeInNotInGCG = calculateFamilyRepresentatives(exportData);
+    
+    // Find people currently listed in "Not in GCG"
+    const currentlyListed = new Set(currentNotInGCG.map(p => p.personId));
+    const shouldBeListed = new Set(shouldBeInNotInGCG.map(p => p.personId));
+    
+    // Calculate additions (should be listed but aren't)
+    const additions = shouldBeInNotInGCG.filter(person => 
+      !currentlyListed.has(person.personId)
+    );
+    
+    // Calculate deletions (currently listed but shouldn't be)
+    const deletions = currentNotInGCG.filter(person => 
+      !shouldBeListed.has(person.personId)
+    );
+    
+    console.log(`✅ Family logic results: ${additions.length} additions, ${deletions.length} deletions`);
+    
+    return {
+      additions: additions,
+      deletions: deletions,
+      familyGroupsProcessed: shouldBeInNotInGCG.length
+    };
+    
+  } catch (error) {
+    console.error('❌ Family logic calculation failed:', error.message);
+    throw error;
+  }
+}
+
+/**
+ * Get current members from "Not in GCG" tab with Person IDs
+ * @param {GoogleAppsScript.Spreadsheet.Spreadsheet} ss - Spreadsheet object
+ * @returns {Array} Current "Not in GCG" members
+ */
+function getCurrentNotInGCGMembers(ss) {
+  console.log('📋 Reading current "Not in GCG" tab...');
+  
+  const sheet = ss.getSheetByName('Not in a GCG');
+  if (!sheet) {
+    console.warn('⚠️ "Not in a GCG" sheet not found');
+    return [];
+  }
+  
+  const data = sheet.getDataRange().getValues();
+  if (data.length <= 3) { // Headers in row 3, data starts row 4
+    return [];
+  }
+  
+  // Find headers (should be in row 3)
+  const headers = data[2]; // Row 3 (index 2)
+  const personIdCol = findColumnIndex(headers, 'Person ID');
+  const firstNameCol = findColumnIndex(headers, 'First Name');
+  const lastNameCol = findColumnIndex(headers, 'Last Name');
+  const familyIdCol = findColumnIndex(headers, 'Family');
+  const familyRoleCol = findColumnIndex(headers, 'Family Role');
+  
+  if (personIdCol === -1) {
+    console.warn('⚠️ Person ID column not found in "Not in GCG" tab');
+    return [];
+  }
+  
+  const members = [];
+  for (let i = 3; i < data.length; i++) { // Data starts row 4 (index 3)
+    const row = data[i];
+    
+    if (row[personIdCol]) {
+      members.push({
+        personId: String(row[personIdCol]),
+        firstName: row[firstNameCol] || '',
+        lastName: row[lastNameCol] || '',
+        familyId: row[familyIdCol] || null,
+        familyRole: row[familyRoleCol] || null,
+        rowIndex: i + 1
+      });
+    }
+  }
+  
+  console.log(`✅ Found ${members.length} current "Not in GCG" members`);
+  return members;
+}
+
+/**
+ * Calculate family representatives for "Not in GCG" using priority logic
+ * @param {Object} exportData - Full export data
+ * @returns {Array} Family representatives who should be in "Not in GCG"
+ */
+function calculateFamilyRepresentatives(exportData) {
+  console.log('👨‍👩‍👧‍👦 Calculating family representatives...');
+  
+  // Get active members not in GCGs
+  const notInGCGCandidates = exportData.membersWithGCGStatus.filter(m => 
+    !m.gcgStatus.inGroup && m.isActiveMember && !m.isSynthetic
+  );
+  
+  console.log(`📋 Found ${notInGCGCandidates.length} active members not in GCGs`);
+  
+  // Group by Family ID
+  const familyGroups = new Map();
+  const individualsWithoutFamily = [];
+  
+  notInGCGCandidates.forEach(person => {
+    // Note: These fields come from the Active Members export
+    const familyId = person.familyId || person.family; // Handle different field names
+    const familyRole = person.familyRole || person.family_role; // Handle different field names
+    
+    if (familyId && familyId !== 'null' && familyId !== '') {
+      if (!familyGroups.has(familyId)) {
+        familyGroups.set(familyId, []);
+      }
+      familyGroups.get(familyId).push({
+        ...person,
+        familyId: familyId,
+        familyRole: familyRole
+      });
+    } else {
+      // Individual without family
+      individualsWithoutFamily.push({
+        ...person,
+        familyId: null,
+        familyRole: null
+      });
+    }
+  });
+  
+  console.log(`👨‍👩‍👧‍👦 Processing ${familyGroups.size} families and ${individualsWithoutFamily.length} individuals`);
+  
+  const representatives = [];
+  
+  // Process families - pick one representative per family
+  familyGroups.forEach((familyMembers, familyId) => {
+    const representative = selectFamilyRepresentative(familyMembers);
+    if (representative) {
+      representatives.push(representative);
+    }
+  });
+  
+  // Add individuals without families
+  representatives.push(...individualsWithoutFamily);
+  
+  console.log(`✅ Selected ${representatives.length} family representatives`);
+  
+  return representatives;
+}
+
+/**
+ * Select the best family representative based on priority rules
+ * @param {Array} familyMembers - Array of family members not in GCGs
+ * @returns {Object} Selected family representative
+ */
+function selectFamilyRepresentative(familyMembers) {
+  if (familyMembers.length === 0) return null;
+  if (familyMembers.length === 1) return familyMembers[0];
+  
+  // Sort by family role priority (lower number = higher priority)
+  const sortedMembers = familyMembers.sort((a, b) => {
+    const priorityA = getFamilyRolePriority(a.familyRole);
+    const priorityB = getFamilyRolePriority(b.familyRole);
+    
+    if (priorityA !== priorityB) {
+      return priorityA - priorityB; // Lower priority number = higher actual priority
+    }
+    
+    // If same priority, sort by age (older first) - use birthdate if available
+    // For now, just use first name alphabetically as tie-breaker
+    return (a.firstName || '').localeCompare(b.firstName || '');
+  });
+  
+  const selected = sortedMembers[0];
+  
+  console.log(`👨‍👩‍👧‍👦 Family ${selected.familyId}: Selected ${selected.firstName} ${selected.lastName} (${selected.familyRole || 'No Role'}) from ${familyMembers.length} members`);
+  
+  return selected;
+}
+
+/**
+ * Enhanced data parsing that includes family information from Active Members export
+ * @returns {Object} Enhanced GCG data with family information
+ */
+function parseRealGCGDataWithFamilyInfo() {
+  console.log('🎯 Parsing REAL GCG data with family information...');
+  
+  try {
+    // Get the standard data using smart file detection
+    const standardData = parseRealGCGDataWithGCGMembers();
+    
+    // Enhance active members with family information from the export
+    const enhancedActiveMembers = enhanceActiveMembersWithFamilyData(standardData.activeMembers);
+    
+    // Recreate membersWithGCGStatus with enhanced family data
+    const enhancedMembersWithGCGStatus = enhancedActiveMembers.map(member => {
+      const gcgAssignment = standardData.assignments[member.personId];
+      return {
+        ...member,
+        gcgStatus: {
+          inGroup: !!gcgAssignment,
+          groupName: gcgAssignment?.groupName || null,
+          leader: gcgAssignment?.leader || null,
+          coLeader: gcgAssignment?.coLeader || null
+        }
+      };
+    });
+    
+    const inGCG = enhancedMembersWithGCGStatus.filter(m => m.gcgStatus.inGroup).length;
+    const notInGCG = enhancedMembersWithGCGStatus.filter(m => !m.gcgStatus.inGroup).length;
+    const participationRate = (inGCG / enhancedActiveMembers.length * 100).toFixed(1);
+    
+    console.log('\n📊 ENHANCED RESULTS WITH FAMILY DATA:');
+    console.log(`👥 Active Members: ${enhancedActiveMembers.length}`);
+    console.log(`🏘️ GCG Groups: ${standardData.groups.length}`);
+    console.log(`✅ In GCGs: ${inGCG} (${participationRate}%)`);
+    console.log(`❌ Not in GCGs: ${notInGCG}`);
+    
+    return {
+      ...standardData,
+      activeMembers: enhancedActiveMembers,
+      membersWithGCGStatus: enhancedMembersWithGCGStatus,
+      summary: {
+        ...standardData.summary,
+        totalActiveMembers: enhancedActiveMembers.length,
+        inGCG: inGCG,
+        notInGCG: notInGCG,
+        participationRate: participationRate
+      }
+    };
+    
+  } catch (error) {
+    console.error('❌ Enhanced family data parsing failed:', error.message);
+    throw error;
+  }
+}
+
+/**
+ * Enhance active members with family data from the original export
+ * @param {Array} activeMembers - Original active members array
+ * @returns {Array} Enhanced active members with family information
+ */
+function enhanceActiveMembersWithFamilyData(activeMembers) {
+  console.log('👨‍👩‍👧‍👦 Enhancing active members with family data...');
+  
+  try {
+    // Re-read the Active Members file to get family information
+    const activeMembersFile = findLatestFile('ACTIVE_MEMBERS');
+    const spreadsheet = SpreadsheetApp.openById(activeMembersFile.getId());
+    const dataSheet = spreadsheet.getSheets()[0];
+    const data = dataSheet.getDataRange().getValues();
+    
+    if (data.length === 0) {
+      console.warn('⚠️ No data in Active Members sheet for family enhancement');
+      return activeMembers;
+    }
+    
+    // Find family-related columns
+    const headers = data[0];
+    const columnMap = {
+      personId: findColumnIndex(headers, 'Breeze ID'),
+      familyId: findColumnIndex(headers, 'Family'),
+      familyRole: findColumnIndex(headers, 'Family Role'),
+      membershipStartDate: findColumnIndex(headers, 'Membership Start Date'),
+      yearsSinceMembership: findColumnIndex(headers, 'Years Since Membership Start Date')
+    };
+    
+    // Create lookup map for family data
+    const familyDataMap = new Map();
+    for (let i = 1; i < data.length; i++) {
+      const row = data[i];
+      const personId = String(row[columnMap.personId]);
+      
+      if (personId) {
+        familyDataMap.set(personId, {
+          familyId: row[columnMap.familyId] || null,
+          familyRole: row[columnMap.familyRole] || null,
+          membershipStartDate: row[columnMap.membershipStartDate] || null,
+          yearsSinceMembership: row[columnMap.yearsSinceMembership] || null
+        });
+      }
+    }
+    
+    // Enhance active members with family data
+    const enhancedMembers = activeMembers.map(member => {
+      const familyData = familyDataMap.get(member.personId) || {};
+      return {
+        ...member,
+        familyId: familyData.familyId,
+        familyRole: familyData.familyRole,
+        membershipStartDate: familyData.membershipStartDate,
+        yearsSinceMembership: familyData.yearsSinceMembership
+      };
+    });
+    
+    const withFamilyData = enhancedMembers.filter(m => m.familyId).length;
+    console.log(`✅ Enhanced ${enhancedMembers.length} members: ${withFamilyData} have family data`);
+    
+    return enhancedMembers;
+    
+  } catch (error) {
+    console.error('❌ Family data enhancement failed:', error.message);
+    // Return original members if enhancement fails
+    return activeMembers;
+  }
+}
+
+/**
+ * Main enhanced comparison function that uses family logic
+ * @param {Object} exportData - Enhanced export data with family information
+ * @returns {Object} Changes needed with family-aware "Not in GCG" processing
+ */
+function enhancedCompareWithFamilyLogic(exportData) {
+  console.log('🔍 Enhanced comparison with family logic...');
+  
+  try {
+    // Get the standard comparison results for GCG members
+    const standardChanges = fixedCompareWithInactiveFiltering(exportData);
+    
+    // Calculate family-aware "Not in GCG" changes
+    const notInGCGChanges = calculateNotInGCGChangesWithFamilyLogic(exportData);
+    
+    console.log('\n📊 ENHANCED COMPARISON RESULTS:');
+    console.log(`🔄 GCG Member changes: ${standardChanges.additions.length + standardChanges.updates.length + standardChanges.removals.length}`);
+    console.log(`👨‍👩‍👧‍👦 Not in GCG changes: ${notInGCGChanges.additions.length + notInGCGChanges.deletions.length}`);
+    console.log(`📋 Family groups processed: ${notInGCGChanges.familyGroupsProcessed}`);
+    
+    return {
+      ...standardChanges,
+      notInGCGChanges: notInGCGChanges,
+      familyProcessing: {
+        familyGroupsProcessed: notInGCGChanges.familyGroupsProcessed,
+        additionsCount: notInGCGChanges.additions.length,
+        deletionsCount: notInGCGChanges.deletions.length
+      }
+    };
+    
+  } catch (error) {
+    console.error('❌ Enhanced family comparison failed:', error.message);
+    throw error;
+  }
+}
+
+/**
+ * Updated helper function to calculate Not in GCG changes (used by preview report)
+ * This replaces the previous calculateNotInGCGChanges function
+ * @param {Object} exportData - Full export data
+ * @returns {Object} People to add/remove from "Not in GCG" tab with real family data
+ */
+function calculateNotInGCGChanges(exportData) {
+  console.log('📋 Calculating Not in GCG changes with family logic...');
+  
+  try {
+    // Use the enhanced family logic
+    return calculateNotInGCGChangesWithFamilyLogic(exportData);
+  } catch (error) {
+    console.warn('⚠️ Family logic failed, falling back to simple logic:', error.message);
+    
+    // Fallback to simple logic if family processing fails
+    const notInGCGFromExport = exportData.membersWithGCGStatus.filter(m => 
+      !m.gcgStatus.inGroup && m.isActiveMember && !m.isSynthetic
+    );
+    
+    const additions = notInGCGFromExport.slice(0, 10).map(person => ({
+      personId: person.personId,
+      firstName: person.firstName,
+      lastName: person.lastName,
+      familyId: person.familyId || 'null',
+      familyRole: person.familyRole || 'null'
+    }));
+    
+    return {
+      additions: additions,
+      deletions: [],
+      familyGroupsProcessed: 0
+    };
+  }
+}
+
+/**
+ * Find column index by header name (case-insensitive) - reused utility
+ * @param {Array} headers - Array of header names
+ * @param {string} searchName - Column name to find
+ * @returns {number} Column index or -1 if not found
+ */
+function findColumnIndex(headers, searchName) {
+  const searchLower = searchName.toLowerCase();
+  
+  for (let i = 0; i < headers.length; i++) {
+    if (headers[i] && headers[i].toString().toLowerCase().includes(searchLower)) {
+      return i;
+    }
+  }
+  
+  return -1;
+}
+
+// Keep all existing functions from the original comparison-engine.js
+// (getGCGMembersWithPersonId, isMarkedInactive, normalizeGroupName, 
+//  fixedCompareWithInactiveFiltering, parseRealGCGDataWithGCGMembers, etc.)
 
 /**
  * Get GCG Members with Person ID from the sheet
@@ -384,24 +817,6 @@ function findHeaderRow(data) {
     const hasLast = row.some(cell => cell && cell.toString().toLowerCase().includes('last'));
     
     if (hasFirst && hasLast) {
-      return i;
-    }
-  }
-  
-  return -1;
-}
-
-/**
- * Find column index by header name (case-insensitive)
- * @param {Array} headers - Array of header names
- * @param {string} searchName - Column name to find
- * @returns {number} Column index or -1 if not found
- */
-function findColumnIndex(headers, searchName) {
-  const searchLower = searchName.toLowerCase();
-  
-  for (let i = 0; i < headers.length; i++) {
-    if (headers[i] && headers[i].toString().toLowerCase().includes(searchLower)) {
       return i;
     }
   }
