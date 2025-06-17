@@ -306,7 +306,7 @@ function findGroupSpecificChangesWithInactive(group, changes, exportData, allCur
 }
 
 /**
- * Build Section 3: Statistics (F2:G5) - Updated formatting without vertical borders
+ * Build Section 3: Statistics (F2:I5) - Labels in F, data in I, no vertical borders
  * Shows overall statistics about membership with clean counts
  */
 function buildStatsReport(sheet, exportData) {
@@ -319,25 +319,25 @@ function buildStatsReport(sheet, exportData) {
   const activeNotInGCGCount = originalActiveCount - activeInGCGCount;
   const gcgMembersNotInActive = exportData.summary.syntheticMembers || 0;
   
-  // Clean statistics - labels in F, data in G
+  // Clean statistics - labels in F, data in I (G and H are buffer)
   sheet.getRange('F2').setValue('Active Members:');
-  sheet.getRange('G2').setValue(originalActiveCount);
+  sheet.getRange('I2').setValue(originalActiveCount);
   
   sheet.getRange('F3').setValue('Active Members in GCGs:');
-  sheet.getRange('G3').setValue(activeInGCGCount);
+  sheet.getRange('I3').setValue(activeInGCGCount);
   
   sheet.getRange('F4').setValue('Active Members not in GCGs:');
-  sheet.getRange('G4').setValue(activeNotInGCGCount);
+  sheet.getRange('I4').setValue(activeNotInGCGCount);
   
   sheet.getRange('F5').setValue('GCG Members not in Active list:');
-  sheet.getRange('G5').setValue(gcgMembersNotInActive);
+  sheet.getRange('I5').setValue(gcgMembersNotInActive);
   
   // Make labels bold
   sheet.getRange('F2:F5').setFontWeight('bold');
   
-  // Add borders but NO background for the fourth line per feedback
-  sheet.getRange('F2:G4').setBorder(true, true, true, true, true, true);
-  sheet.getRange('F5:G5').setBorder(true, true, true, true, false, false); // No internal borders for last row
+  // Add borders but NO internal vertical borders and NO background for the fourth line
+  sheet.getRange('F2:I4').setBorder(true, true, true, true, false, true); // No internal vertical borders
+  sheet.getRange('F5:I5').setBorder(true, true, true, true, false, false); // No internal borders for last row
   
   console.log('✅ Built statistics section with clean counts');
 }
