@@ -44,6 +44,9 @@ function generatePreviewReport() {
     // Format the sheet for readability
     formatPreviewSheet(previewSheet);
     
+    // Activate the preview sheet to keep focus on it
+    previewSheet.activate();
+    
     console.log('✅ Preview report generated successfully');
     console.log('📋 Check the "Breeze Update Preview" tab to review all changes');
     
