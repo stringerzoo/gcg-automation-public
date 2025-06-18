@@ -1329,3 +1329,66 @@ function inspectCalculateNotInGCGChangesFunction() {
     console.log('❌ calculateNotInGCGChangesWithFamilyLogic function NOT found');
   }
 }
+
+/**
+ * Debug function to see what's happening with exclusions
+ * Add this to comparison-engine.js and run it
+ */
+function debugExclusions() {
+  console.log('🔍 Debugging exclusions for Elders and Tuesday School...');
+  
+  try {
+    // Get the family-enhanced data
+    const exportData = parseRealGCGDataWithFamilyInfo();
+    
+    // Test the exclusion function
+    console.log('📊 Testing getExcludedPersonIds...');
+    const excludedIds = getExcludedPersonIds(exportData);
+    console.log(`🚫 Found ${excludedIds.size} excluded people:`);
+    
+    // Show who's excluded
+    excludedIds.forEach(personId => {
+      const assignment = exportData.assignments[personId];
+      if (assignment) {
+        console.log(`   🚫 ${personId} - ${assignment.groupName}`);
+      }
+    });
+    
+    // Check specific people from your results
+    const testPeople = [
+      { name: 'Dan Gurtner', id: '29767590' },
+      { name: 'Douglas Sturgeon', id: '29760286' },
+      { name: 'Jacob Oldham', id: '35252936' }
+    ];
+    
+    console.log('\n🔍 Checking specific people:');
+    testPeople.forEach(person => {
+      const isExcluded = excludedIds.has(person.id);
+      const assignment = exportData.assignments[person.id];
+      const groupName = assignment ? assignment.groupName : 'Not in any group';
+      
+      console.log(`   ${person.name} (${person.id}): ${isExcluded ? '🚫 EXCLUDED' : '✅ INCLUDED'} - Group: ${groupName}`);
+    });
+    
+    // Show all group names to see what we're working with
+    console.log('\n📋 All group names in assignments:');
+    const allGroupNames = new Set();
+    Object.values(exportData.assignments).forEach(assignment => {
+      allGroupNames.add(assignment.groupName);
+    });
+    
+    Array.from(allGroupNames).sort().forEach(groupName => {
+      console.log(`   - ${groupName}`);
+    });
+    
+    return {
+      excludedCount: excludedIds.size,
+      excludedIds: Array.from(excludedIds)
+    };
+    
+  } catch (error) {
+    console.error('❌ Debug failed:', error.message);
+    console.error('Stack trace:', error.stack);
+    throw error;
+  }
+}
