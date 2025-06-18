@@ -1073,3 +1073,70 @@ function debugPreviewReportDataFlow() {
     throw error;
   }
 }
+
+/**
+ * Debug function to see exactly what error is happening in the preview report
+ */
+function debugPreviewFamilyLogicError() {
+  console.log('🔍 Debugging preview family logic error...');
+  
+  try {
+    // Test the exact same flow as the preview report
+    console.log('📊 Step 1: Get family-enhanced data (same as preview)...');
+    const exportData = parseRealGCGDataWithFamilyInfo();
+    console.log(`✅ Family-enhanced data loaded: ${exportData.activeMembers.length} members`);
+    
+    // Test calling calculateNotInGCGChanges exactly like the preview does
+    console.log('📊 Step 2: Call calculateNotInGCGChanges (preview function)...');
+    const previewChanges = calculateNotInGCGChanges(exportData);
+    console.log(`✅ Preview changes: ${previewChanges.additions.length} additions, ${previewChanges.deletions.length} deletions`);
+    
+    // Check if we're getting TBD values
+    if (previewChanges.additions.length > 0) {
+      const firstAddition = previewChanges.additions[0];
+      console.log('📋 First addition details:');
+      console.log(`   Name: ${firstAddition.firstName} ${firstAddition.lastName}`);
+      console.log(`   Family ID: ${firstAddition.familyId}`);
+      console.log(`   Family Role: ${firstAddition.familyRole}`);
+      
+      if (firstAddition.familyId === 'TBD') {
+        console.log('❌ PROBLEM: Getting TBD values - fallback logic is running!');
+      } else {
+        console.log('✅ Getting real family data - family logic is working!');
+      }
+    }
+    
+    // Test calling the family logic directly
+    console.log('📊 Step 3: Call family logic directly...');
+    const familyChanges = calculateNotInGCGChangesWithFamilyLogic(exportData);
+    console.log(`✅ Direct family logic: ${familyChanges.additions.length} additions, ${familyChanges.deletions.length} deletions`);
+    
+    // Compare results
+    console.log('\n🔍 COMPARISON:');
+    console.log(`Preview function: ${previewChanges.additions.length} additions`);
+    console.log(`Direct family function: ${familyChanges.additions.length} additions`);
+    
+    if (previewChanges.additions.length !== familyChanges.additions.length) {
+      console.log('❌ MISMATCH: Preview is using fallback logic!');
+      
+      // Check if Babatola family is properly reduced
+      const babatolaInPreview = previewChanges.additions.filter(p => p.lastName === 'Babatola').length;
+      const babatolaInFamily = familyChanges.additions.filter(p => p.lastName === 'Babatola').length;
+      
+      console.log(`Babatola family in preview: ${babatolaInPreview} members`);
+      console.log(`Babatola family in family logic: ${babatolaInFamily} members`);
+    } else {
+      console.log('✅ MATCH: Preview is using family logic correctly!');
+    }
+    
+    return {
+      preview: previewChanges,
+      family: familyChanges
+    };
+    
+  } catch (error) {
+    console.error('❌ Debug failed:', error.message);
+    console.error('Stack trace:', error.stack);
+    throw error;
+  }
+}
