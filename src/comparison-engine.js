@@ -195,15 +195,32 @@ function calculateFamilyRepresentatives(exportData) {
   const excludedPersonIds = getExcludedPersonIds(exportData);
   console.log(`🚫 Found ${excludedPersonIds.size} people to exclude (Elders + Tuesday School)`);
   
-  // Get active members not in GCGs, excluding Elders and Tuesday School
+  // ALSO get people marked as inactive in the current GCG Members sheet
+  const config = getConfig();
+  const ss = SpreadsheetApp.openById(config.SHEET_ID);
+  const allCurrentMembers = getGCGMembersWithPersonId(ss);
+  const inactivePersonIds = new Set(
+    allCurrentMembers
+      .filter(member => isMarkedInactive(member))
+      .map(member => member.personId)
+      .filter(id => id) // Only include those with Person IDs
+  );
+  
+  console.log(`⚠️ Found ${inactivePersonIds.size} people marked inactive in current sheet`);
+  
+  // Combine both exclusion sets
+  const allExcludedIds = new Set([...excludedPersonIds, ...inactivePersonIds]);
+  console.log(`🚫 Total excluded: ${allExcludedIds.size} people`);
+  
+  // Get active members not in GCGs, excluding Elders, Tuesday School, AND inactive members
   const notInGCGCandidates = exportData.membersWithGCGStatus.filter(m => 
     !m.gcgStatus.inGroup && 
     m.isActiveMember && 
     !m.isSynthetic &&
-    !excludedPersonIds.has(m.personId) // NEW: Exclude Elders and Tuesday School
+    !allExcludedIds.has(m.personId) // ENHANCED: Exclude both admin tags AND inactive members
   );
   
-  console.log(`📋 Found ${notInGCGCandidates.length} active members not in GCGs (after exclusions)`);
+  console.log(`📋 Found ${notInGCGCandidates.length} active members not in GCGs (after all exclusions)`);
   
   // Group by Family ID
   const familyGroups = new Map();
@@ -246,11 +263,10 @@ function calculateFamilyRepresentatives(exportData) {
   // Add individuals without families
   representatives.push(...individualsWithoutFamily);
   
-  console.log(`✅ Selected ${representatives.length} family representatives (after exclusions)`);
+  console.log(`✅ Selected ${representatives.length} family representatives (after all exclusions)`);
   
   return representatives;
 }
-
 /**
  * NEW FUNCTION: Get Person IDs of people who should be excluded from "Not in GCG" analysis
  * @param {Object} exportData - Full export data with GCG assignments
@@ -269,24 +285,30 @@ function getExcludedPersonIds(exportData) {
     
     console.log(`📊 Scanning ${allSheets.length} total tabs for exclusions...`);
     
-    // Look for specific administrative tabs
+    // FIXED: More specific exclusion tab names (exact matches only)
     const exclusionTabs = [
-      'Elders',
-      'Tuesday School',
-      'Elders and Elders\' Wives',
-      'Tuesday School w/ Pastor Doug'
+      { name: 'Elders', exact: true },
+      { name: 'Tuesday School W Pastor Doug', exact: true },
+      { name: 'Elders And Elders Wives', exact: true },
+      { name: 'Elders Children Under 18', exact: true }
+      // NOTE: Removed "Elders Children" (the broader category) but kept "Elders Children Under 18"
+      // This should exclude children under 18 but allow adult children of elders to remain in the list
     ];
     
     allSheets.forEach(sheet => {
       const sheetName = sheet.getName();
       
-      // Check if this is an exclusion tab (case-insensitive)
-      const isExclusionTab = exclusionTabs.some(exclusionName => 
-        sheetName.toLowerCase().includes(exclusionName.toLowerCase())
-      );
+      // Check if this is an exclusion tab using exact matching
+      const matchingTab = exclusionTabs.find(exclusionTab => {
+        if (exclusionTab.exact) {
+          return sheetName.toLowerCase() === exclusionTab.name.toLowerCase();
+        } else {
+          return sheetName.toLowerCase().includes(exclusionTab.name.toLowerCase());
+        }
+      });
       
-      if (isExclusionTab) {
-        console.log(`🚫 Processing exclusion tab: "${sheetName}"`);
+      if (matchingTab) {
+        console.log(`🚫 Processing exclusion tab: "${sheetName}" (exact match for "${matchingTab.name}")`);
         
         try {
           const data = sheet.getDataRange().getValues();
@@ -318,7 +340,7 @@ function getExcludedPersonIds(exportData) {
       }
     });
     
-    console.log(`✅ Found ${excludedIds.size} people to exclude from ${exclusionTabs.length} administrative tabs`);
+    console.log(`✅ Found ${excludedIds.size} people to exclude from administrative tabs`);
     
   } catch (error) {
     console.error('❌ Failed to read exclusion tabs:', error.message);
@@ -327,7 +349,6 @@ function getExcludedPersonIds(exportData) {
   
   return excludedIds;
 }
-
 /**
  * Select the best family representative based on priority rules
  * @param {Array} familyMembers - Array of family members not in GCGs
