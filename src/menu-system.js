@@ -18,6 +18,8 @@ function onOpen() {
     .addSeparator()
     .addItem('⚙️ Configure Settings', 'showConfigDialog')
     .addItem('🔧 System Health Check', 'runHealthCheck')
+    .addSeparator()
+    .addItem('📖 View Documentation & Code', 'openGitHubRepo')
     .addToUi();
 }
 
@@ -327,6 +329,30 @@ function performHealthCheck() {
   }
   
   return results;
+}
+
+/**
+ * Open GitHub repository in a new tab
+ * Provides direct access to documentation and source code
+ */
+function openGitHubRepo() {
+  // Replace with your actual GitHub repository URL
+  const repoUrl = 'https://github.com/stringerzoo/gcg-automation-public';
+  
+  // Create HTML content that opens the link immediately
+  const htmlContent = `
+    <script>
+      window.open('${repoUrl}', '_blank');
+      google.script.host.close();
+    </script>
+    <p>Opening GitHub repository...</p>
+  `;
+  
+  const htmlOutput = HtmlService.createHtmlOutput(htmlContent)
+    .setWidth(300)
+    .setHeight(100);
+  
+  SpreadsheetApp.getUi().showModalDialog(htmlOutput, 'GitHub Repository');
 }
 
 /**
