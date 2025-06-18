@@ -55,7 +55,7 @@ function calculateNotInGCGChangesWithFamilyLogic(exportData) {
     );
     
     // Calculate deletions (currently listed but shouldn't be)
-    // IMPORTANT: Only delete if the person is no longer active OR now in a GCG
+    // ENHANCED: Look up proper Family ID and Family Role from exportData
     const deletions = [];
     currentNotInGCG.forEach(currentPerson => {
       if (!currentPerson.personId) return; // Skip if no Person ID
@@ -75,23 +75,26 @@ function calculateNotInGCGChangesWithFamilyLogic(exportData) {
           reason = 'Data inconsistency - not in active members export';
         }
         
+        // FIXED: Use proper Family ID and Family Role from exportData lookup
+        const properFamilyId = personInExport ? personInExport.familyId : null;
+        const properFamilyRole = personInExport ? personInExport.familyRole : null;
+        
         deletions.push({
-          ...currentPerson,
-          reason: reason
+          personId: currentPerson.personId,
+          firstName: currentPerson.firstName,
+          lastName: currentPerson.lastName,
+          // FIXED: Use looked-up values instead of family-grouped data
+          familyId: properFamilyId,
+          familyRole: properFamilyRole,
+          reason: reason,
+          rowIndex: currentPerson.rowIndex
         });
         
-        console.log(`➖ Deletion: ${currentPerson.firstName} ${currentPerson.lastName} - ${reason}`);
+        console.log(`➖ Deletion: ${currentPerson.firstName} ${currentPerson.lastName} - ${reason} (Family ID: ${properFamilyId || 'none'})`);
       }
     });
     
     console.log(`✅ Family logic results: ${additions.length} additions, ${deletions.length} deletions`);
-    
-    // Debug the specific people you mentioned
-    const testPeople = ['Thomas Prater', 'Matthew Hunt', 'Rachel King'];
-    testPeople.forEach(name => {
-      const inDeletions = deletions.find(d => `${d.firstName} ${d.lastName}`.includes(name.split(' ')[0]));
-      console.log(`🔍 ${name}: ${inDeletions ? '➖ In deletions' : '✅ Not in deletions'}`);
-    });
     
     return {
       additions: additions,
