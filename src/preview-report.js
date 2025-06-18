@@ -438,7 +438,10 @@ function buildDataInconsistenciesReport(sheet, exportData) {
     return;
   }
   
-  let currentRow = 26; // Added 1-row buffer from Section 4
+  // Find where Section 4 ended by looking for the last data row in Section 4
+  let currentRow = findLastDataRowInSection4(sheet) + 2; // +1 for buffer, +1 for header
+  
+  console.log(`📍 Starting Data Inconsistencies at row ${currentRow} (with buffer)`);
   
   // Section header - extended highlighting to column J per feedback
   sheet.getRange(`F${currentRow}:J${currentRow}`).merge();
@@ -515,4 +518,25 @@ function formatPreviewSheet(sheet) {
   } catch (error) {
     console.warn('⚠️ Some formatting may not have applied:', error.message);
   }
+}
+
+/**
+ * Helper function to find the last data row in Section 4 (Not in GCG)
+ * @param {GoogleAppsScript.Spreadsheet.Sheet} sheet - The preview sheet
+ * @returns {number} Last row number with data in Section 4
+ */
+function findLastDataRowInSection4(sheet) {
+  // Section 4 starts around row 10-12, scan down column F to find last data
+  let lastRow = 10; // Start scanning from row 10
+  
+  // Look for the last row with data in column F (where Section 4 data is)
+  for (let row = 10; row <= 50; row++) {
+    const cellValue = sheet.getRange(`F${row}`).getValue();
+    if (cellValue && cellValue.toString().trim() !== '') {
+      lastRow = row;
+    }
+  }
+  
+  console.log(`📍 Found last Section 4 data at row ${lastRow}`);
+  return lastRow;
 }
