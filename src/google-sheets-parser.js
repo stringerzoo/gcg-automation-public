@@ -99,11 +99,12 @@ function parseActiveMembersSheet(file) {
     const headers = data[0];
     console.log(`📋 Headers: ${headers.slice(0, 8).join(', ')}... (showing first 8)`);
     
-    // Find important column indices
+    // Find important column indices INCLUDING NICKNAME
     const columnMap = {
       personId: findColumnIndex(headers, 'Breeze ID'),
       firstName: findColumnIndex(headers, 'First Name'),
       lastName: findColumnIndex(headers, 'Last Name'),
+      nickname: findColumnIndex(headers, 'Nickname'), // NEW: Capture nickname
       streetAddress: findColumnIndex(headers, 'Street Address'),
       city: findColumnIndex(headers, 'City'),
       state: findColumnIndex(headers, 'State'),
@@ -115,18 +116,33 @@ function parseActiveMembersSheet(file) {
       throw new Error('Required columns (Breeze ID, First Name, Last Name) not found');
     }
     
+    // Log nickname column discovery
+    if (columnMap.nickname >= 0) {
+      console.log(`✅ Found Nickname column at index ${columnMap.nickname}`);
+    } else {
+      console.log(`⚠️ Nickname column not found - nickname matching will be limited`);
+    }
+    
+    console.log('🔍 Column mapping:', JSON.stringify(columnMap));
+    
     // Process member data
     const members = [];
+    let nicknameCount = 0;
+    
     for (let i = 1; i < data.length; i++) {
       const row = data[i];
       
       // Skip empty rows
       if (!row[columnMap.personId]) continue;
       
+      const nickname = columnMap.nickname >= 0 ? (row[columnMap.nickname] || '') : '';
+      if (nickname.trim()) nicknameCount++;
+      
       const member = {
         personId: String(row[columnMap.personId]),
         firstName: row[columnMap.firstName] || '',
         lastName: row[columnMap.lastName] || '',
+        nickname: nickname, // NEW: Include nickname in member data
         fullName: `${row[columnMap.firstName] || ''} ${row[columnMap.lastName] || ''}`.trim(),
         address: {
           street: row[columnMap.streetAddress] || '',
@@ -142,10 +158,12 @@ function parseActiveMembersSheet(file) {
     }
     
     console.log(`✅ Parsed ${members.length} active members`);
+    console.log(`📝 Found ${nicknameCount} members with nicknames`);
     
     return {
       members: members,
       totalCount: members.length,
+      nicknameCount: nicknameCount,
       headers: headers,
       sheetName: dataSheet.getName(),
       lastUpdated: file.getLastUpdated()
