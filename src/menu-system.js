@@ -332,27 +332,87 @@ function performHealthCheck() {
 }
 
 /**
- * Open GitHub repository in a new tab
- * Provides direct access to documentation and source code
+ * Open GitHub repository with comprehensive preview
+ * Shows what users will find before they click the link
  */
 function openGitHubRepo() {
   // Replace with your actual GitHub repository URL
   const repoUrl = 'https://github.com/stringerzoo/gcg-automation-public';
   
-  // Create HTML content that opens the link immediately
   const htmlContent = `
-    <script>
-      window.open('${repoUrl}', '_blank');
-      google.script.host.close();
-    </script>
-    <p>Opening GitHub repository...</p>
+    <div style="font-family: Arial, sans-serif; padding: 20px; line-height: 1.4;">
+      <h2 style="color: #24292e; margin-bottom: 20px;">🔧 GCG Automation System Repository</h2>
+      
+      <div style="background: #f6f8fa; padding: 15px; border-radius: 6px; margin-bottom: 20px;">
+        <p style="margin: 0; font-weight: bold; color: #0366d6;">
+          📖 Complete documentation, source code, and support resources
+        </p>
+      </div>
+      
+      <h3 style="color: #24292e; margin-bottom: 10px;">📋 What you'll find in the repository:</h3>
+      
+      <div style="margin-bottom: 20px;">
+        <p><strong>📚 Documentation Files:</strong></p>
+        <ul style="margin: 8px 0; padding-left: 20px;">
+          <li><strong>README.md</strong> - System overview, features, and architecture</li>
+          <li><strong>SETUP.md</strong> - Complete installation and configuration guide</li>
+          <li><strong>TROUBLESHOOTING.md</strong> - Problem resolution and debugging</li>
+        </ul>
+        
+        <p><strong>💻 Source Code:</strong></p>
+        <ul style="margin: 8px 0; padding-left: 20px;">
+          <li><strong>/src/config.js</strong> - Configuration management</li>
+          <li><strong>/src/smart-file-detection.js</strong> - Automatic file finding</li>
+          <li><strong>/src/google-sheets-parser.js</strong> - Data parsing from exports</li>
+          <li><strong>/src/comparison-engine.js</strong> - Core comparison logic</li>
+          <li><strong>/src/preview-report.js</strong> - Preview report generation</li>
+          <li><strong>/src/menu-system.js</strong> - User interface (this menu!)</li>
+        </ul>
+        
+        <p><strong>🛠️ Support Resources:</strong></p>
+        <ul style="margin: 8px 0; padding-left: 20px;">
+          <li><strong>Issue tracking</strong> - Report bugs or request features</li>
+          <li><strong>Version history</strong> - See all updates and changes</li>
+          <li><strong>Technical support</strong> - Contact information and guidelines</li>
+        </ul>
+      </div>
+      
+      <div style="background: #fff3cd; border: 1px solid #ffeaa7; padding: 12px; border-radius: 4px; margin-bottom: 20px;">
+        <p style="margin: 0; font-size: 14px;">
+          💡 <strong>Tip:</strong> Bookmark the repository for easy access to troubleshooting guides and updates!
+        </p>
+      </div>
+      
+      <div style="text-align: center; margin: 25px 0;">
+        <a href="${repoUrl}" target="_blank" 
+           style="display: inline-block; background: #28a745; color: white; padding: 12px 24px; 
+                  text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 16px;">
+          🚀 Open GitHub Repository
+        </a>
+      </div>
+      
+      <div style="border-top: 1px solid #e1e4e8; padding-top: 15px; margin-top: 20px;">
+        <p style="font-size: 12px; color: #586069; margin: 5px 0;">
+          <strong>Repository URL:</strong> <code style="background: #f6f8fa; padding: 2px 4px; border-radius: 3px;">${repoUrl}</code>
+        </p>
+        <p style="font-size: 12px; color: #586069; margin: 5px 0;">
+          <em>If the link doesn't open automatically, copy the URL above and paste it into your browser.</em>
+        </p>
+      </div>
+      
+      <div style="text-align: center; margin-top: 20px;">
+        <input type="button" value="Close" onclick="google.script.host.close();" 
+               style="background: #6c757d; color: white; border: none; padding: 8px 16px; 
+                      border-radius: 4px; cursor: pointer; font-size: 14px;">
+      </div>
+    </div>
   `;
   
   const htmlOutput = HtmlService.createHtmlOutput(htmlContent)
-    .setWidth(300)
-    .setHeight(100);
+    .setWidth(600)
+    .setHeight(550);
   
-  SpreadsheetApp.getUi().showModalDialog(htmlOutput, 'GitHub Repository');
+  SpreadsheetApp.getUi().showModalDialog(htmlOutput, 'GCG Automation Repository');
 }
 
 /**
