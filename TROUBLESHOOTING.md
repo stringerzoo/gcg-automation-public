@@ -1,285 +1,416 @@
 # GCG Automation Troubleshooting Guide
 
-Common issues and solutions for the GCG Automation System.
+Comprehensive troubleshooting guide for the GCG Automation System.
 
 ## 🚨 Quick Diagnostic Steps
 
-When something isn't working:
+### 1. Run Health Check First
+Before troubleshooting, always run the system health check:
+1. **Open your Google Sheet**
+2. **Go to**: Breeze Update → System Health Check
+3. **Review results**: Look for ❌ red X marks indicating issues
+4. **Focus on failures**: Address critical issues first
 
-1. **Run Health Check**: `Breeze Update → System Health Check`
-2. **Check Recent Changes**: Did you upload new files or change settings?
-3. **Verify Access**: Can you manually open the Drive folder and Google Sheet?
-4. **Review Error Messages**: Look for specific error details in Apps Script logs
+### 2. Check System Status
+Use the built-in diagnostics to understand what's working:
+- ✅ **Green**: Component working properly
+- ⚠️ **Yellow**: Warning or minor issue
+- ❌ **Red**: Critical failure requiring attention
 
-## 🔧 Common Issues & Solutions
+## 🔧 Common Issues and Solutions
 
-### Menu Not Appearing
+### Menu System Issues
 
-#### Symptom
-"Breeze Update" menu is missing from Google Sheets menu bar.
+#### "Breeze Update" Menu Not Appearing
+**Symptoms**: No custom menu visible in Google Sheets
 
-#### Solutions
-1. **Refresh the page** (Ctrl+F5 or Cmd+Shift+R)
-2. **Check script binding**:
-   - Go to `Extensions → Apps Script`
-   - Should open your GCG project (not a new untitled project)
-   - If it opens a new project, you need to create a container-bound script
-3. **Run manually**: Execute `onOpen()` function from Apps Script
-4. **Authorization**: Grant permissions if prompted
+**Causes & Solutions**:
+1. **Apps Script not bound to sheet**
+   - Check: Go to Extensions → Apps Script
+   - Solution: Ensure the script is opened FROM your Google Sheet, not standalone
+   - Test: URL should show your sheet ID in the Apps Script interface
 
-#### Root Causes
-- Script not bound to the sheet
-- Missing authorization
-- Code errors preventing menu creation
+2. **Missing or incomplete code files**
+   - Check: Verify all 6 files exist in Apps Script project
+   - Solution: Copy missing files from `/src/` folder
+   - Required files: `config.js`, `smart-file-detection.js`, `google-sheets-parser.js`, `comparison-engine.js`, `preview-report.js`, `menu-system.js`
 
----
+3. **Code errors preventing menu creation**
+   - Check: Look for error messages in Apps Script logs
+   - Solution: Fix syntax errors, save all files
+   - Test: Manually run `onOpen()` function
 
-### Health Check Failures
+4. **Browser caching issues**
+   - Solution: Refresh the Google Sheet page (F5 or Ctrl+R)
+   - Alternative: Open sheet in incognito/private browsing mode
 
-#### Drive Access Failed
-```
-❌ Google Drive access failed: Exception: Invalid argument
-```
-
-**Solutions**:
-- **Check Folder ID**: Verify `DRIVE_FOLDER_ID` in Script Properties
-- **Check Permissions**: Ensure you can access the folder manually
-- **Update Configuration**: Use the correct folder ID from the URL
-
-#### Sheet Access Failed  
-```
-❌ Google Sheet access failed: Exception: Invalid argument
-```
+#### Menu Items Not Working
+**Symptoms**: Menu appears but items don't respond or show errors
 
 **Solutions**:
-- **Check Sheet ID**: Verify `SHEET_ID` in Script Properties  
-- **Check Permissions**: Ensure you can edit the sheet manually
-- **Verify Tabs**: Confirm sheet has "GCG Members", "Not in a GCG", "Group List" tabs
+1. **Check function names match exactly** in menu-system.js
+2. **Verify permissions** are granted for all required services
+3. **Review Apps Script logs** for specific error messages
+4. **Re-run authorization** by executing any function manually
 
-#### Export Files Not Found
-```
-❌ Export files not found: No files found matching pattern "immanuelky-people"
-```
+### File Detection Issues
+
+#### "Export Files Not Found" Error
+**Symptoms**: Health check shows files not found, or preview generation fails
+
+**Troubleshooting Steps**:
+1. **Verify file location**
+   ```
+   Check: Are files in the correct Google Drive folder?
+   Solution: Upload files to folder specified in DRIVE_FOLDER_ID
+   ```
+
+2. **Check file naming patterns**
+   ```
+   Required patterns:
+   - Active Members: must contain "immanuelky-people"
+   - Tags Export: must contain "immanuelky-tags"
+   
+   Examples:
+   ✅ immanuelky-people-06-13-2025.xlsx
+   ✅ immanuelky-tags-06-13-2025.xlsx  
+   ❌ active-members-export.xlsx
+   ❌ church-tags.xlsx
+   ```
+
+3. **Verify file format**
+   ```
+   Required: Google Sheets format (converted from Excel)
+   Not supported: Raw .xlsx files uploaded to Drive
+   Solution: Export directly to Google Sheets from Breeze
+   ```
+
+4. **Check folder permissions**
+   ```
+   Test: Can you open the folder URL manually?
+   Solution: Ensure your account has edit access to the folder
+   ```
+
+#### "Files Found But Can't Read Data" Error
+**Symptoms**: Files detected but parsing fails
 
 **Solutions**:
-- **Check File Names**: Files must contain "immanuelky-people" and "immanuelky-tags"
-- **Check Location**: Files must be in the configured Google Drive folder
-- **Check Format**: Files should be Google Sheets, not Excel
-- **Re-upload**: Try uploading files again with correct naming
+1. **Verify export completeness**
+   - Open files manually and check they contain expected data
+   - Ensure headers are present and match expected format
+   - Verify Person IDs are populated
 
----
+2. **Check export settings in Breeze**
+   - Export to Google Sheets (not Excel download then upload)
+   - Include all required fields
+   - Ensure no corruption during export
+
+### Data Parsing Issues
+
+#### "No Person IDs Found" Error
+**Symptoms**: Parser can't find Person ID column
+
+**Solutions**:
+1. **Check Active Members export**
+   ```
+   Required: "Breeze ID" or "Person ID" column
+   Location: Should be first column (Column A)
+   Format: Numeric values (e.g., 29771102)
+   ```
+
+2. **Verify header format**
+   ```
+   Expected headers: "Breeze ID", "First Name", "Last Name"
+   Case sensitive: No, but spelling must be close
+   Extra spaces: System handles automatically
+   ```
+
+#### "No GCG Groups Found" Error
+**Symptoms**: Tags export contains no recognizable GCG data
+
+**Solutions**:
+1. **Check GCG naming convention**
+   ```
+   Expected format: Sheets named "Gcg [Leader Name]"
+   Examples:
+   ✅ "Gcg Aaron White"
+   ✅ "Gcg Gene Cone & Scott Stringer"
+   ❌ "Aaron White Group"
+   ❌ "GCG Leadership" (excluded as admin)
+   ```
+
+2. **Verify export includes GCG tags**
+   - Ensure Breeze export includes all GCG-related tags
+   - Check that individual GCG sheets exist in the exported file
+   - Verify sheets contain member data
+
+#### "Family Data Missing" Warning
+**Symptoms**: Preview shows "TBD" for Family ID/Role
+
+**Solutions**:
+1. **Update Breeze export settings**
+   ```
+   Required fields in Active Members export:
+   - Family ID
+   - Family Role (Head of Household, Spouse, Adult, Child)
+   ```
+
+2. **Check family data completeness**
+   - Not all members need family assignments
+   - Single individuals may show empty family data (normal)
+   - Only affects "Not in GCG" family grouping
 
 ### Preview Report Issues
 
-#### No Changes Showing (When You Expect Changes)
-```
-📊 Total real changes: 0
-```
-
-**Possible Causes**:
-1. **Already Synced**: Your sheet might already be up to date
-2. **Missing Person IDs**: Check if column A has Person IDs populated
-3. **Name Mismatches**: Export vs sheet might have different name formats
-4. **Inactive Filtering**: People marked inactive are automatically excluded
+#### "Preview Report Generation Failed" Error
+**Symptoms**: Preview report doesn't generate or shows incomplete data
 
 **Solutions**:
-- **Check Person IDs**: Ensure column A of "GCG Members" has Person IDs
-- **Review Action Steps**: Look for people marked as "inactive"
-- **Compare Manually**: Check a few names between export and sheet
+1. **Check data consistency**
+   ```
+   Common issues:
+   - Missing Person IDs in GCG Members tab
+   - Mismatched data between exports and current sheet
+   - Corrupted export files
+   ```
 
-#### Too Many Changes Showing
-```
-📊 Total real changes: 200+
-```
+2. **Verify sheet structure**
+   ```
+   Required tabs in Google Sheet:
+   - "GCG Members" (with Person ID in column A)
+   - "Not in a GCG" (with proper family structure)
+   - "Group List" (with group leader names)
+   ```
 
-**Possible Causes**:
-1. **Missing Person IDs**: System falling back to name matching
-2. **Data Mismatch**: Export from wrong time period
-3. **Group Name Differences**: Format differences not being normalized
+3. **Test with simplified data**
+   - Try with a smaller export file to isolate issues
+   - Check specific groups that might have formatting problems
 
-**Solutions**:
-- **Populate Person IDs**: Ensure all members have Person IDs in column A
-- **Check Export Dates**: Verify you're using current export files
-- **Review Group Names**: Look for format differences like "John Smith" vs "John Smith & Co-Leader"
+#### Preview Report Shows Unexpected Results
+**Symptoms**: Large numbers of changes, incorrect family grouping, or "TBD" values
 
----
+**Common Causes & Solutions**:
 
-### Data Parsing Errors
+1. **Group name format differences**
+   ```
+   Problem: Current sheet has "Gene Cone", export has "Gene Cone & Scott Stringer"
+   Solution: System should normalize automatically
+   Expected: These should NOT show as updates
+   Check: Look for pattern of co-leader additions in preview
+   ```
 
-#### Synthetic Members Warning
-```
-📋 4 GCG members not in Active Members list
-```
+2. **Inactive member handling**
+   ```
+   Problem: Preview shows people who should be filtered out
+   Solution: Mark inactive members in "Action Steps / Comments" column
+   Keywords: "inactive", "moved away", "left church", "transferred"
+   ```
 
-**This is Normal**: This indicates people in GCG tags who aren't in the Active Members export.
+3. **Family grouping issues**
+   ```
+   Problem: Multiple family members listed instead of one representative
+   Cause: Missing Family ID or Family Role data
+   Solution: Ensure Breeze export includes family information
+   ```
 
-**Action Needed**:
-1. **Review Preview Report Section 5**: See who these people are
-2. **Check in Breeze**: Are they truly active or inactive?
-3. **Update Breeze**: Either add to Active Members tag OR remove from GCG tag
+### Data Comparison Issues
 
-#### Sheet Structure Errors
-```
-❌ Required columns (First Name, Last Name) not found
-```
+#### "Too Many Changes Detected" Warning
+**Symptoms**: Preview shows hundreds of changes when expecting few
 
-**Solutions**:
-- **Check Headers**: Ensure "GCG Members" tab has proper column headers
-- **Check Row Position**: Headers should be in row 1 or 2
-- **Check Spelling**: Headers must contain "First" and "Last" (case insensitive)
+**Troubleshooting Steps**:
+1. **Check for duplicate functions**
+   ```
+   Problem: Multiple versions of comparison functions in code
+   Solution: Search for duplicate function names in Apps Script
+   Remove: Old or test versions of functions
+   ```
 
----
+2. **Verify normalization working**
+   ```
+   Test: Look for patterns in the changes
+   Expected: Most "updates" should be filtered out by normalization
+   Problem: Co-leader format differences counted as real changes
+   ```
 
-### Permission Issues
+3. **Review data freshness**
+   ```
+   Check: Are you comparing current exports with current sheet?
+   Problem: Comparing old export data with updated sheet
+   Solution: Ensure exports are recent and complete
+   ```
 
-#### Authorization Required
-```
-Exception: Authorization required
-```
-
-**Solutions**:
-1. **Run from Apps Script**: Execute any function to trigger authorization
-2. **Grant Permissions**: Click "Review Permissions" and approve
-3. **Check Scopes**: Ensure script has Drive and Sheets permissions
-
-#### Sharing Restrictions
-```
-Exception: You don't have permission to access this file
-```
-
-**Solutions**:
-- **Check Drive Sharing**: Ensure folder is shared with your account
-- **Check Sheet Sharing**: Ensure sheet is editable by your account
-- **Use Consistent Account**: Make sure you're signed in with the correct Google account
-
----
-
-### File Format Issues
-
-#### Excel vs Google Sheets
-The system expects **Google Sheets format**, not Excel files.
-
-**Converting Excel to Google Sheets**:
-1. **Upload Excel file** to Google Drive
-2. **Right-click** → "Open with Google Sheets"
-3. **File** → "Save as Google Sheets"
-4. **Rename** with proper naming convention
-
-#### Missing Tabs in Export
-Some exports might be missing expected tabs.
+#### "Person ID Mismatches" Error
+**Symptoms**: Same people showing as both additions and deletions
 
 **Solutions**:
-- **Check Breeze Export Settings**: Ensure all tags are included
-- **Verify Tag Names**: Look for GCG tags starting with "Gcg "
-- **Manual Review**: Open the tags export to verify content
+1. **Check Person ID consistency**
+   ```
+   Verify: Person IDs match exactly between exports and sheet
+   Format: Should be numeric strings (e.g., "29771102")
+   Common issue: Leading zeros or formatting differences
+   ```
 
----
+2. **Review data export quality**
+   ```
+   Test: Open exports manually and verify data integrity
+   Check: No duplicate Person IDs or missing values
+   Solution: Re-export from Breeze if data issues found
+   ```
 
-### Performance Issues
+### Update Application Issues
 
-#### Slow Preview Generation
-Preview reports can take 30-60 seconds for large datasets.
-
-**Normal Behavior**:
-- 35 GCG groups with 500+ members
-- Multiple file reads and comparisons
-- Complex data processing
-
-**If Extremely Slow** (>2 minutes):
-- **Check File Sizes**: Very large exports might cause timeouts
-- **Check Internet**: Slow connection affects Google Drive access
-- **Retry**: Sometimes a simple retry resolves temporary issues
-
-#### Timeout Errors
-```
-Exception: Exceeded maximum execution time
-```
+#### "Updates Failed to Apply" Error
+**Symptoms**: Preview works but applying updates fails
 
 **Solutions**:
-- **Reduce Data**: Try with smaller test files first
-- **Optimize Exports**: Export only necessary data from Breeze
-- **Retry**: Apps Script timeouts can be intermittent
+1. **Check sheet permissions**
+   ```
+   Required: Edit access to the Google Sheet
+   Test: Can you manually edit cells in the sheet?
+   Solution: Ensure proper permissions for your account
+   ```
 
----
+2. **Verify sheet structure integrity**
+   ```
+   Check: All required tabs exist and have expected headers
+   Problem: Headers moved or renamed since setup
+   Solution: Restore proper header structure
+   ```
 
-## 🔍 Debugging Tools
+3. **Review Apps Script quotas**
+   ```
+   Issue: Large updates may hit execution time limits
+   Solution: Break updates into smaller batches
+   Alternative: Run updates during low-usage periods
+   ```
+
+## 🔍 Advanced Debugging
 
 ### Enable Detailed Logging
-Add this to any function for detailed debugging:
+For complex issues, enable detailed logging:
+
+1. **Add debug logging to functions**
+   ```javascript
+   console.log('🔍 Debug point: Variable value =', variableName);
+   ```
+
+2. **Run functions manually in Apps Script**
+   - Select function from dropdown
+   - Click Run button
+   - Review execution transcript for errors
+
+3. **Check execution transcript**
+   - Look for specific error messages
+   - Note line numbers where failures occur
+   - Review stack traces for function call paths
+
+### Test Individual Components
+
+#### Test File Detection
 ```javascript
-console.log('Debug point 1: Starting process');
-// ... your code ...
-console.log('Debug point 2: Completed step X');
+// Run this in Apps Script to test file detection
+function testFileDetection() {
+  try {
+    const activeFile = findLatestFile('ACTIVE_MEMBERS');
+    const tagsFile = findLatestFile('TAGS_EXPORT');
+    console.log('✅ Active Members file:', activeFile.getName());
+    console.log('✅ Tags file:', tagsFile.getName());
+  } catch (error) {
+    console.error('❌ File detection failed:', error.message);
+  }
+}
 ```
 
-### Manual Function Testing
-Test individual components:
-- `testConfig()` - Configuration and access
-- `findLatestFile('ACTIVE_MEMBERS')` - File detection
-- `parseRealGCGDataWithGCGMembers()` - Data parsing
+#### Test Data Parsing
+```javascript
+// Run this to test data parsing specifically
+function testDataParsing() {
+  try {
+    const exportData = parseRealGCGDataWithGCGMembers();
+    console.log('✅ Parsed data summary:', exportData.summary);
+  } catch (error) {
+    console.error('❌ Data parsing failed:', error.message);
+  }
+}
+```
 
-### Check Script Properties
-Verify configuration in Apps Script:
-1. **Project Settings** → **Script Properties**
-2. **Look for**: `GCG_FILE_CONFIG`
-3. **Validate JSON**: Use a JSON validator tool
+#### Test Comparison Logic
+```javascript
+// Run this to test comparison without preview generation
+function testComparison() {
+  try {
+    const exportData = parseRealGCGDataWithGCGMembers();
+    const changes = enhancedCompareWithPersonIds(exportData);
+    console.log('✅ Comparison results:', changes);
+  } catch (error) {
+    console.error('❌ Comparison failed:', error.message);
+  }
+}
+```
 
----
+## 📞 Getting Additional Help
 
-## 📞 When to Contact Support
+### When to Contact Support
+Contact the system administrator when:
+- Health Check shows multiple critical failures
+- Data appears corrupted or inconsistent
+- Updates are producing unexpected results
+- Error messages mention system configuration issues
 
-### Before Contacting Support
-Complete these steps:
-- [ ] Run Health Check and save full output
-- [ ] Try manual access to Drive folder and Google Sheet
-- [ ] Check Apps Script execution transcript for errors
-- [ ] Document exact steps that lead to the issue
+### Information to Provide
+When reporting issues, include:
+1. **Health Check results** (copy/paste full output)
+2. **Specific error messages** from Apps Script logs
+3. **Steps taken** leading to the issue
+4. **Expected vs actual behavior**
+5. **Timing** (when did this work last?)
 
-### Information to Include
-1. **Health Check Results**: Complete output from System Health Check
-2. **Error Messages**: Exact text of any error messages
-3. **Steps to Reproduce**: What you were doing when the issue occurred
-4. **Recent Changes**: Any files uploaded or settings changed
-5. **Screenshots**: Of any error dialogs or unexpected behavior
+### Support Contacts
+- **Primary**: sstringer@immanuelky.org
+- **Emergency**: Contact church IT administrator
+- **Documentation**: Review GitHub repository for latest updates
 
-### Contact Information
-- **Email**: sstringer@immanuelky.org
-- **Subject**: "GCG Automation Support - [Brief Description]"
-- **Include**: All information listed above
+## 🛡️ Prevention Tips
 
-### Response Expectations
-- **Acknowledgment**: Within 24 hours
-- **Resolution**: Simple issues within 48 hours, complex issues may take longer
-- **Follow-up**: You'll receive updates on progress for complex issues
+### Regular Maintenance
+1. **Monthly Health Checks**: Run before each update cycle
+2. **Keep Backups**: Maintain copies of working configurations
+3. **Test Changes**: Use preview reports to validate before applying
+4. **Monitor Data Quality**: Watch for trends in inconsistencies
 
----
+### Best Practices
+1. **Consistent Export Process**: Use same Breeze export settings each time
+2. **File Naming**: Follow established date naming conventions
+3. **Inactive Marking**: Consistently mark inactive members before updates
+4. **Review Previews**: Always examine preview reports thoroughly
 
-## 🛠️ Advanced Troubleshooting
+### Early Warning Signs
+Watch for these indicators of potential issues:
+- **Increasing number of "synthetic members"** (GCG members not in Active list)
+- **Growing family grouping inconsistencies**
+- **Preview reports showing unexpected change volumes**
+- **Health Check warnings becoming more frequent**
 
-### Resetting the System
-If everything is broken and you need to start fresh:
+## 📈 Performance Optimization
 
-1. **Backup Current Data**: Export your current Google Sheet
-2. **Create New Apps Script Project**: Start with clean container-bound script
-3. **Reconfigure**: Set up Script Properties from scratch
-4. **Test Step by Step**: Verify each component before proceeding
+### For Large Data Sets
+If working with very large membership data:
 
-### Manual Data Verification
-To check if the automation is working correctly:
+1. **Increase timeout settings**
+   ```javascript
+   // Add to config.js if needed
+   const PROCESSING_TIMEOUT = 300; // 5 minutes
+   ```
 
-1. **Pick a Test Person**: Find someone in both export and sheet
-2. **Check Person ID**: Verify same ID in both places
-3. **Check Group**: Verify same group assignment
-4. **Check Inactive Status**: Look at Action Steps column
+2. **Process in batches**
+   - Handle large GCG groups separately
+   - Split family processing across multiple operations
+   - Use pagination for large preview reports
 
-### Log Analysis
-To understand what the system is doing:
+3. **Optimize frequency**
+   - Run full updates monthly, not weekly
+   - Use quick checks for interim status
+   - Focus on changed groups only when possible
 
-1. **Open Apps Script Editor**
-2. **View → Logs** or **View → Stackdriver Logging**
-3. **Look for patterns** in error messages or processing steps
-4. **Note timing** of when issues occur
-
----
-
-*Remember: Most issues are configuration-related and can be resolved by carefully checking the setup steps.* 🔧
+This troubleshooting guide should help resolve most issues you'll encounter. Remember that the system includes multiple safety checks and validation steps to prevent data loss, so when in doubt, review the preview report carefully and contact support if needed.
