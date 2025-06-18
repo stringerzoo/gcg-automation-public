@@ -34,7 +34,7 @@ function calculateNotInGCGChangesWithFamilyLogic(exportData) {
   console.log('👨‍👩‍👧‍👦 Calculating Not in GCG changes with family logic...');
   
   try {
-    // Get current "Not in GCG" tab data
+    // Get current "Not in GCG" tab data (with improved family-grouped reading)
     const config = getConfig();
     const ss = SpreadsheetApp.openById(config.SHEET_ID);
     const currentNotInGCG = getCurrentNotInGCGMembers(ss);
@@ -42,9 +42,12 @@ function calculateNotInGCGChangesWithFamilyLogic(exportData) {
     // Find people who SHOULD be in "Not in GCG" (with family representatives)
     const shouldBeInNotInGCG = calculateFamilyRepresentatives(exportData);
     
-    // Find people currently listed in "Not in GCG"
-    const currentlyListed = new Set(currentNotInGCG.map(p => p.personId));
+    // Create lookup maps using Person ID
+    const currentlyListed = new Set(currentNotInGCG.map(p => p.personId).filter(id => id));
     const shouldBeListed = new Set(shouldBeInNotInGCG.map(p => p.personId));
+    
+    console.log(`📊 Currently listed: ${currentlyListed.size} people`);
+    console.log(`📊 Should be listed: ${shouldBeListed.size} people`);
     
     // Calculate additions (should be listed but aren't)
     const additions = shouldBeInNotInGCG.filter(person => 
@@ -52,11 +55,43 @@ function calculateNotInGCGChangesWithFamilyLogic(exportData) {
     );
     
     // Calculate deletions (currently listed but shouldn't be)
-    const deletions = currentNotInGCG.filter(person => 
-      !shouldBeListed.has(person.personId)
-    );
+    // IMPORTANT: Only delete if the person is no longer active OR now in a GCG
+    const deletions = [];
+    currentNotInGCG.forEach(currentPerson => {
+      if (!currentPerson.personId) return; // Skip if no Person ID
+      
+      const shouldBeIncluded = shouldBeListed.has(currentPerson.personId);
+      
+      if (!shouldBeIncluded) {
+        // Check WHY they shouldn't be included
+        const personInExport = exportData.membersWithGCGStatus.find(m => m.personId === currentPerson.personId);
+        
+        let reason = 'Unknown';
+        if (!personInExport) {
+          reason = 'No longer in active members';
+        } else if (personInExport.gcgStatus.inGroup) {
+          reason = `Now in GCG: ${personInExport.gcgStatus.groupName}`;
+        } else if (personInExport.isSynthetic) {
+          reason = 'Data inconsistency - not in active members export';
+        }
+        
+        deletions.push({
+          ...currentPerson,
+          reason: reason
+        });
+        
+        console.log(`➖ Deletion: ${currentPerson.firstName} ${currentPerson.lastName} - ${reason}`);
+      }
+    });
     
     console.log(`✅ Family logic results: ${additions.length} additions, ${deletions.length} deletions`);
+    
+    // Debug the specific people you mentioned
+    const testPeople = ['Thomas Prater', 'Matthew Hunt', 'Rachel King'];
+    testPeople.forEach(name => {
+      const inDeletions = deletions.find(d => `${d.firstName} ${d.lastName}`.includes(name.split(' ')[0]));
+      console.log(`🔍 ${name}: ${inDeletions ? '➖ In deletions' : '✅ Not in deletions'}`);
+    });
     
     return {
       additions: additions,
@@ -74,9 +109,10 @@ function calculateNotInGCGChangesWithFamilyLogic(exportData) {
  * Get current members from "Not in GCG" tab with Person IDs
  * @param {GoogleAppsScript.Spreadsheet.Spreadsheet} ss - Spreadsheet object
  * @returns {Array} Current "Not in GCG" members
+ * updated to handle family-grouped format
  */
 function getCurrentNotInGCGMembers(ss) {
-  console.log('📋 Reading current "Not in GCG" tab...');
+  console.log('📋 Reading current "Not in GCG" tab (family-grouped format)...');
   
   const sheet = ss.getSheetByName('Not in a GCG');
   if (!sheet) {
@@ -92,10 +128,13 @@ function getCurrentNotInGCGMembers(ss) {
   // Find headers (should be in row 3)
   const headers = data[2]; // Row 3 (index 2)
   const personIdCol = findColumnIndex(headers, 'Person ID');
-  const firstNameCol = findColumnIndex(headers, 'First Name');
-  const lastNameCol = findColumnIndex(headers, 'Last Name');
+  const familyNameCol = findColumnIndex(headers, 'Family Name'); // Column A - modified family names
+  const firstNameCol = findColumnIndex(headers, 'First Name'); // Column B - comma-separated first names
+  const lastNameCol = findColumnIndex(headers, 'Last Name'); // Column C - family last name
   const familyIdCol = findColumnIndex(headers, 'Family');
   const familyRoleCol = findColumnIndex(headers, 'Family Role');
+  
+  console.log(`🔍 Column mapping: PersonID=${personIdCol}, FamilyName=${familyNameCol}, FirstName=${firstNameCol}, LastName=${lastNameCol}`);
   
   if (personIdCol === -1) {
     console.warn('⚠️ Person ID column not found in "Not in GCG" tab');
@@ -107,14 +146,35 @@ function getCurrentNotInGCGMembers(ss) {
     const row = data[i];
     
     if (row[personIdCol]) {
+      // For family-grouped data, we use the Family Name (Column A) as the primary identifier
+      // This has been manually edited to show the specific person's name (like "Rachel King")
+      const familyName = row[familyNameCol] || '';
+      const commaSeparatedFirstNames = row[firstNameCol] || '';
+      const lastName = row[lastNameCol] || '';
+      
+      // Extract the actual person's name from Family Name column
+      // Family Name should be like "Rachel King" (manually edited) or "John & Sally Smith" (default)
+      let actualFirstName = '';
+      if (familyName.includes('&')) {
+        // Default family format - use first name from comma-separated list
+        actualFirstName = commaSeparatedFirstNames.split(',')[0].trim();
+      } else {
+        // Manually edited to show specific person - extract first name
+        const nameParts = familyName.trim().split(' ');
+        actualFirstName = nameParts[0];
+      }
+      
       members.push({
         personId: String(row[personIdCol]),
-        firstName: row[firstNameCol] || '',
-        lastName: row[lastNameCol] || '',
+        firstName: actualFirstName,
+        lastName: lastName,
+        familyName: familyName, // Keep the full family name for reference
         familyId: row[familyIdCol] || null,
         familyRole: row[familyRoleCol] || null,
         rowIndex: i + 1
       });
+      
+      console.log(`📋 Current member: ${actualFirstName} ${lastName} (Family Name: "${familyName}", ID: ${row[personIdCol]})`);
     }
   }
   
