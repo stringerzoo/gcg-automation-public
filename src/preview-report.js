@@ -354,7 +354,7 @@ function buildStatsReport(sheet, exportData) {
 }
 
 /**
- * Build Section 4: Not in GCG Updates (F10+) - Updated header formatting
+ * Build Section 4: Not in GCG Updates (F10+) - Updated header formatting, remove 'null' labels
  * Shows proposed updates to the "Not in a GCG" tab
  */
 function buildNotInGCGReport(sheet, exportData) {
@@ -393,8 +393,9 @@ function buildNotInGCGReport(sheet, exportData) {
       sheet.getRange(currentRow, 6).setValue(person.personId);
       sheet.getRange(currentRow, 7).setValue(person.firstName);
       sheet.getRange(currentRow, 8).setValue(person.lastName);
-      sheet.getRange(currentRow, 9).setValue(person.familyId || 'null');
-      sheet.getRange(currentRow, 10).setValue(person.familyRole || 'null');
+      // FIXED: Use empty string instead of "null" for missing family data
+      sheet.getRange(currentRow, 9).setValue(person.familyId || '');
+      sheet.getRange(currentRow, 10).setValue(person.familyRole || '');
       currentRow++;
     });
   } else {
@@ -414,8 +415,9 @@ function buildNotInGCGReport(sheet, exportData) {
       sheet.getRange(currentRow, 6).setValue(person.personId);
       sheet.getRange(currentRow, 7).setValue(person.firstName);
       sheet.getRange(currentRow, 8).setValue(person.lastName);
-      sheet.getRange(currentRow, 9).setValue(person.familyId || 'null');
-      sheet.getRange(currentRow, 10).setValue(person.familyRole || 'null');
+      // FIXED: Use empty string instead of "null" for missing family data
+      sheet.getRange(currentRow, 9).setValue(person.familyId || '');
+      sheet.getRange(currentRow, 10).setValue(person.familyRole || '');
       currentRow++;
     });
   } else {
