@@ -427,33 +427,6 @@ function buildNotInGCGReport(sheet, exportData) {
 }
 
 /**
- * Helper function to calculate Not in GCG changes
- * @param {Object} exportData - Full export data
- * @returns {Object} People to add/remove from "Not in GCG" tab
- */
-function calculateNotInGCGChanges(exportData) {
-  // Get people not in GCGs from export data
-  const notInGCGFromExport = exportData.membersWithGCGStatus.filter(m => 
-    !m.gcgStatus.inGroup && m.isActiveMember && !m.isSynthetic
-  );
-  
-  // For now, return simplified structure
-  // In full implementation, this would compare with current "Not in GCG" tab
-  const additions = notInGCGFromExport.slice(0, 10).map(person => ({
-    personId: person.personId,
-    firstName: person.firstName,
-    lastName: person.lastName,
-    familyId: 'TBD', // Would come from family data
-    familyRole: 'TBD' // Would come from family data
-  }));
-  
-  return {
-    additions: additions,
-    deletions: [] // Would be populated by comparing with current sheet
-  };
-}
-
-/**
  * Build Section 5: Data Inconsistencies (F26+) - Updated formatting and instructions
  * Shows GCG members who aren't in the Active Members list
  */
