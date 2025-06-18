@@ -391,7 +391,9 @@ function calculateNotInGCGChanges(exportData) {
     // Use the enhanced family logic
     return calculateNotInGCGChangesWithFamilyLogic(exportData);
   } catch (error) {
-    console.warn('⚠️ Family logic failed, falling back to simple logic:', error.message);
+    console.error('❌ FAMILY LOGIC ERROR (details):', error.message);
+    console.error('❌ Error stack:', error.stack);
+    console.warn('⚠️ Family logic failed, falling back to simple logic');    
     
     // Fallback to simple logic if family processing fails
     const notInGCGFromExport = exportData.membersWithGCGStatus.filter(m => 
