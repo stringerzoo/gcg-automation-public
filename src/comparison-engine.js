@@ -257,24 +257,73 @@ function calculateFamilyRepresentatives(exportData) {
  * @returns {Set} Set of Person IDs to exclude
  */
 function getExcludedPersonIds(exportData) {
+  console.log('🚫 Finding excluded Person IDs from raw tags data...');
+  
   const excludedIds = new Set();
   
-  // Find Elders and Tuesday School members from the assignments
-  Object.entries(exportData.assignments).forEach(([personId, assignment]) => {
-    const groupName = assignment.groupName.toLowerCase();
+  try {
+    // Get the raw tags file to read Elders and Tuesday School directly
+    const tagsFile = findLatestFile('TAGS_EXPORT');
+    const spreadsheet = SpreadsheetApp.openById(tagsFile.getId());
+    const allSheets = spreadsheet.getSheets();
     
-    // Exclude Elders
-    if (groupName.includes('elder')) {
-      excludedIds.add(personId);
-      console.log(`🚫 Excluding Elder: ${personId} (${assignment.groupName})`);
-    }
+    console.log(`📊 Scanning ${allSheets.length} total tabs for exclusions...`);
     
-    // Exclude Tuesday School
-    if (groupName.includes('tuesday school')) {
-      excludedIds.add(personId);
-      console.log(`🚫 Excluding Tuesday School: ${personId} (${assignment.groupName})`);
-    }
-  });
+    // Look for specific administrative tabs
+    const exclusionTabs = [
+      'Elders',
+      'Tuesday School',
+      'Elders and Elders\' Wives',
+      'Tuesday School w/ Pastor Doug'
+    ];
+    
+    allSheets.forEach(sheet => {
+      const sheetName = sheet.getName();
+      
+      // Check if this is an exclusion tab (case-insensitive)
+      const isExclusionTab = exclusionTabs.some(exclusionName => 
+        sheetName.toLowerCase().includes(exclusionName.toLowerCase())
+      );
+      
+      if (isExclusionTab) {
+        console.log(`🚫 Processing exclusion tab: "${sheetName}"`);
+        
+        try {
+          const data = sheet.getDataRange().getValues();
+          if (data.length <= 1) return; // Skip if no data
+          
+          // Find Person ID column (should be first column typically)
+          const headers = data[0];
+          const personIdCol = findColumnIndex(headers, 'Person ID');
+          
+          if (personIdCol === -1) {
+            console.warn(`⚠️ No Person ID column found in ${sheetName}`);
+            return;
+          }
+          
+          // Add all Person IDs from this tab to exclusions
+          for (let i = 1; i < data.length; i++) {
+            const row = data[i];
+            const personId = row[personIdCol];
+            
+            if (personId) {
+              excludedIds.add(String(personId));
+              console.log(`🚫 Excluding: ${personId} from ${sheetName}`);
+            }
+          }
+          
+        } catch (error) {
+          console.warn(`⚠️ Failed to process ${sheetName}: ${error.message}`);
+        }
+      }
+    });
+    
+    console.log(`✅ Found ${excludedIds.size} people to exclude from ${exclusionTabs.length} administrative tabs`);
+    
+  } catch (error) {
+    console.error('❌ Failed to read exclusion tabs:', error.message);
+    console.warn('⚠️ Continuing without exclusions');
+  }
   
   return excludedIds;
 }
@@ -1341,44 +1390,41 @@ function debugExclusions() {
     // Get the family-enhanced data
     const exportData = parseRealGCGDataWithFamilyInfo();
     
-    // Test the exclusion function
-    console.log('📊 Testing getExcludedPersonIds...');
+    // Test the NEW exclusion function
+    console.log('📊 Testing NEW getExcludedPersonIds (reads raw tags)...');
     const excludedIds = getExcludedPersonIds(exportData);
-    console.log(`🚫 Found ${excludedIds.size} excluded people:`);
+    console.log(`🚫 Found ${excludedIds.size} excluded people`);
     
-    // Show who's excluded
-    excludedIds.forEach(personId => {
-      const assignment = exportData.assignments[personId];
-      if (assignment) {
-        console.log(`   🚫 ${personId} - ${assignment.groupName}`);
-      }
+    // Show first 10 excluded people
+    console.log('📋 First 10 excluded people:');
+    Array.from(excludedIds).slice(0, 10).forEach(personId => {
+      // Try to find their name from active members
+      const person = exportData.activeMembers.find(m => m.personId === personId);
+      const name = person ? `${person.firstName} ${person.lastName}` : 'Unknown';
+      console.log(`   🚫 ${personId} - ${name}`);
     });
     
-    // Check specific people from your results
+    // Check specific people from your preview results who SHOULD be excluded
     const testPeople = [
-      { name: 'Dan Gurtner', id: '29767590' },
-      { name: 'Douglas Sturgeon', id: '29760286' },
-      { name: 'Jacob Oldham', id: '35252936' }
+      { name: 'Jacob Oldham', id: '35252936', reason: 'Should be excluded - Tuesday School member' },
+      { name: 'Douglas Sturgeon', id: '29760286', reason: 'Should be excluded if Elder' }
     ];
     
-    console.log('\n🔍 Checking specific people:');
+    // Also check people who should NOT be excluded
+    const shouldNotBeExcluded = [
+      { name: 'Dan Gurtner', id: '29767590', reason: 'Should NOT be excluded - not an Elder' }
+    ];
+    
+    console.log('\n🔍 Checking people who SHOULD be excluded:');
     testPeople.forEach(person => {
       const isExcluded = excludedIds.has(person.id);
-      const assignment = exportData.assignments[person.id];
-      const groupName = assignment ? assignment.groupName : 'Not in any group';
-      
-      console.log(`   ${person.name} (${person.id}): ${isExcluded ? '🚫 EXCLUDED' : '✅ INCLUDED'} - Group: ${groupName}`);
+      console.log(`   ${person.name} (${person.id}): ${isExcluded ? '🚫 EXCLUDED ✅' : '✅ INCLUDED ❌'} - ${person.reason}`);
     });
     
-    // Show all group names to see what we're working with
-    console.log('\n📋 All group names in assignments:');
-    const allGroupNames = new Set();
-    Object.values(exportData.assignments).forEach(assignment => {
-      allGroupNames.add(assignment.groupName);
-    });
-    
-    Array.from(allGroupNames).sort().forEach(groupName => {
-      console.log(`   - ${groupName}`);
+    console.log('\n🔍 Checking people who should NOT be excluded:');
+    shouldNotBeExcluded.forEach(person => {
+      const isExcluded = excludedIds.has(person.id);
+      console.log(`   ${person.name} (${person.id}): ${isExcluded ? '🚫 EXCLUDED ❌' : '✅ INCLUDED ✅'} - ${person.reason}`);
     });
     
     return {
