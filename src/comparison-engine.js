@@ -1142,3 +1142,96 @@ function debugPreviewFamilyLogicError() {
     throw error;
   }
 }
+
+/**
+ * Direct test of the calculateNotInGCGChanges function to see what's happening
+ */
+function testCalculateNotInGCGChangesDirectly() {
+  console.log('🧪 Testing calculateNotInGCGChanges function directly...');
+  
+  try {
+    // Get family-enhanced data
+    const exportData = parseRealGCGDataWithFamilyInfo();
+    console.log('✅ Got family-enhanced data');
+    
+    // Add debug logging inside the try block
+    console.log('📋 About to call calculateNotInGCGChanges...');
+    console.log('📋 Calculating Not in GCG changes with family logic...');
+    
+    let result;
+    try {
+      console.log('🔄 Trying family logic...');
+      result = calculateNotInGCGChangesWithFamilyLogic(exportData);
+      console.log('✅ Family logic succeeded!');
+    } catch (error) {
+      console.error('❌ CAUGHT ERROR in family logic:', error.message);
+      console.error('❌ Error type:', error.name);
+      console.error('❌ Full error:', error);
+      console.error('❌ Stack trace:', error.stack);
+      
+      // Manual fallback
+      console.log('🔄 Using manual fallback...');
+      const notInGCGFromExport = exportData.membersWithGCGStatus.filter(m => 
+        !m.gcgStatus.inGroup && m.isActiveMember && !m.isSynthetic
+      );
+      
+      result = {
+        additions: notInGCGFromExport.slice(0, 10).map(person => ({
+          personId: person.personId,
+          firstName: person.firstName,
+          lastName: person.lastName,
+          familyId: person.familyId || 'TBD',
+          familyRole: person.familyRole || 'TBD'
+        })),
+        deletions: [],
+        familyGroupsProcessed: 0
+      };
+    }
+    
+    console.log(`✅ Final result: ${result.additions.length} additions, ${result.deletions.length} deletions`);
+    
+    // Check first addition
+    if (result.additions.length > 0) {
+      const first = result.additions[0];
+      console.log(`📋 First addition: ${first.firstName} ${first.lastName}`);
+      console.log(`   Family ID: ${first.familyId}`);
+      console.log(`   Family Role: ${first.familyRole}`);
+    }
+    
+    return result;
+    
+  } catch (error) {
+    console.error('❌ Outer test failed:', error.message);
+    throw error;
+  }
+}
+
+/**
+ * Test if the calculateNotInGCGChanges function exists and what it returns
+ */
+function inspectCalculateNotInGCGChangesFunction() {
+  console.log('🔍 Inspecting calculateNotInGCGChanges function...');
+  
+  // Check if function exists
+  if (typeof calculateNotInGCGChanges === 'function') {
+    console.log('✅ calculateNotInGCGChanges function exists');
+    
+    // Check function source (first few lines)
+    const functionSource = calculateNotInGCGChanges.toString();
+    const lines = functionSource.split('\n').slice(0, 10);
+    console.log('📋 Function start:');
+    lines.forEach((line, index) => {
+      console.log(`   ${index + 1}: ${line}`);
+    });
+    
+  } else {
+    console.log('❌ calculateNotInGCGChanges function NOT found');
+  }
+  
+  // Check if family function exists
+  if (typeof calculateNotInGCGChangesWithFamilyLogic === 'function') {
+    console.log('✅ calculateNotInGCGChangesWithFamilyLogic function exists');
+  } else {
+    console.log('❌ calculateNotInGCGChangesWithFamilyLogic function NOT found');
+  }
+}
