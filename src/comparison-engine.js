@@ -994,6 +994,238 @@ function findHeaderRow(data) {
 }
 
 /**
+ * Enhanced fuzzy name matching that includes nicknames
+ * Add these functions to comparison-engine.js
+ */
+
+/**
+ * Create enhanced name lookup map that includes nicknames
+ * @param {Array} activeMembers - Array of active members with nickname data
+ * @returns {Map} Enhanced lookup map with multiple name variations
+ */
+function createEnhancedNameLookup(activeMembers) {
+  console.log('🔍 Creating enhanced name lookup with nickname support...');
+  
+  const nameLookup = new Map();
+  let nicknameCount = 0;
+  
+  activeMembers.forEach(member => {
+    const personId = member.personId;
+    const firstName = member.firstName || '';
+    const lastName = member.lastName || '';
+    const nickname = member.nickname || ''; // This should come from the Active Members export
+    
+    // Standard full name
+    const fullName = `${firstName} ${lastName}`.trim().toLowerCase();
+    if (fullName) {
+      nameLookup.set(fullName, { personId, member, matchType: 'fullName' });
+    }
+    
+    // If nickname exists, also add nickname + last name
+    if (nickname && nickname.trim()) {
+      const nicknameFullName = `${nickname.trim()} ${lastName}`.trim().toLowerCase();
+      nameLookup.set(nicknameFullName, { personId, member, matchType: 'nickname' });
+      nicknameCount++;
+      
+      console.log(`📝 Added nickname mapping: "${nicknameFullName}" for ${firstName} ${lastName} (ID: ${personId})`);
+    }
+    
+    // Also add first name only variations for better fuzzy matching
+    if (firstName) {
+      const firstOnly = firstName.toLowerCase();
+      if (!nameLookup.has(firstOnly)) {
+        nameLookup.set(firstOnly, { personId, member, matchType: 'firstOnly' });
+      }
+    }
+    
+    if (nickname && nickname.trim()) {
+      const nicknameOnly = nickname.trim().toLowerCase();
+      if (!nameLookup.has(nicknameOnly)) {
+        nameLookup.set(nicknameOnly, { personId, member, matchType: 'nicknameOnly' });
+      }
+    }
+  });
+  
+  console.log(`✅ Enhanced lookup created: ${nameLookup.size} name variations, ${nicknameCount} nicknames`);
+  return nameLookup;
+}
+
+/**
+ * Enhanced name matching function that tries multiple strategies
+ * @param {string} searchName - Name to search for (like "Moses Babatola")
+ * @param {Map} nameLookup - Enhanced name lookup map
+ * @returns {Object|null} Matching member data or null
+ */
+function findPersonByEnhancedName(searchName, nameLookup) {
+  if (!searchName) return null;
+  
+  const searchLower = searchName.toLowerCase().trim();
+  
+  // Strategy 1: Exact match
+  if (nameLookup.has(searchLower)) {
+    const match = nameLookup.get(searchLower);
+    console.log(`✅ Found exact match for "${searchName}": ${match.member.firstName} ${match.member.lastName} (${match.matchType})`);
+    return match;
+  }
+  
+  // Strategy 2: Try first name + last name separately
+  const nameParts = searchLower.split(' ').filter(part => part.length > 0);
+  if (nameParts.length >= 2) {
+    const firstName = nameParts[0];
+    const lastName = nameParts[nameParts.length - 1];
+    
+    // Look for matches where first name OR nickname matches, AND last name matches
+    for (const [lookupName, data] of nameLookup.entries()) {
+      const lookupParts = lookupName.split(' ');
+      if (lookupParts.length >= 2) {
+        const lookupFirst = lookupParts[0];
+        const lookupLast = lookupParts[lookupParts.length - 1];
+        
+        if (lookupLast === lastName && lookupFirst === firstName) {
+          console.log(`✅ Found component match for "${searchName}": ${data.member.firstName} ${data.member.lastName} (${data.matchType})`);
+          return data;
+        }
+      }
+    }
+  }
+  
+  // Strategy 3: Fuzzy matching for common variations
+  const commonVariations = [
+    searchLower.replace(/\s+/g, ''), // Remove spaces
+    searchLower.replace(/[^a-z\s]/g, ''), // Remove special characters
+  ];
+  
+  for (const variation of commonVariations) {
+    if (nameLookup.has(variation)) {
+      const match = nameLookup.get(variation);
+      console.log(`✅ Found fuzzy match for "${searchName}": ${match.member.firstName} ${match.member.lastName} (${match.matchType})`);
+      return match;
+    }
+  }
+  
+  console.log(`❌ No match found for "${searchName}"`);
+  return null;
+}
+
+/**
+ * Enhanced populatePersonIds function that uses nickname matching
+ * Replace the existing populatePersonIds function in comparison-engine.js
+ */
+function populatePersonIdsWithNicknames() {
+  console.log('🔧 Populating Person IDs with nickname support...');
+  
+  try {
+    // Get export data and current sheet data
+    const exportData = parseRealGCGDataWithFamilyInfo();
+    const config = getConfig();
+    const ss = SpreadsheetApp.openById(config.SHEET_ID);
+    const sheet = ss.getSheetByName('GCG Members');
+    
+    if (!sheet) {
+      throw new Error('GCG Members sheet not found');
+    }
+    
+    // Create enhanced name lookup with nicknames
+    const nameLookup = createEnhancedNameLookup(exportData.activeMembers);
+    
+    // Get current sheet data
+    const data = sheet.getDataRange().getValues();
+    const headerRowIndex = findHeaderRow(data);
+    const headers = data[headerRowIndex >= 0 ? headerRowIndex : 1];
+    
+    const cols = {
+      personId: findColumnIndex(headers, 'Person ID'),
+      firstName: findColumnIndex(headers, 'First'),
+      lastName: findColumnIndex(headers, 'Last')
+    };
+    
+    if (cols.personId === -1) {
+      throw new Error('Person ID column not found');
+    }
+    
+    let populated = 0;
+    let nicknameMatches = 0;
+    
+    // Process each row
+    const dataStartRow = (headerRowIndex >= 0 ? headerRowIndex : 1) + 1;
+    for (let i = dataStartRow; i < data.length; i++) {
+      const row = data[i];
+      
+      // Skip if Person ID already exists or no name data
+      if (row[cols.personId] || !row[cols.firstName] || !row[cols.lastName]) {
+        continue;
+      }
+      
+      const searchName = `${row[cols.firstName]} ${row[cols.lastName]}`.trim();
+      const match = findPersonByEnhancedName(searchName, nameLookup);
+      
+      if (match) {
+        // Update the Person ID in the sheet
+        sheet.getRange(i + 1, cols.personId + 1).setValue(match.personId);
+        populated++;
+        
+        if (match.matchType === 'nickname' || match.matchType === 'nicknameOnly') {
+          nicknameMatches++;
+          console.log(`🎯 Nickname match: "${searchName}" → ${match.member.firstName} ${match.member.lastName} (nickname: ${match.member.nickname})`);
+        }
+      }
+    }
+    
+    console.log(`✅ Populated ${populated} Person IDs (${nicknameMatches} via nickname matching)`);
+    
+    return {
+      totalPopulated: populated,
+      nicknameMatches: nicknameMatches,
+      nameLookupSize: nameLookup.size
+    };
+    
+  } catch (error) {
+    console.error('❌ Enhanced Person ID population failed:', error.message);
+    throw error;
+  }
+}
+
+/**
+ * Test function to check nickname matching
+ */
+function testNicknameMatching() {
+  console.log('🧪 Testing nickname matching system...');
+  
+  try {
+    const exportData = parseRealGCGDataWithFamilyInfo();
+    const nameLookup = createEnhancedNameLookup(exportData.activeMembers);
+    
+    // Test cases
+    const testCases = [
+      'Moses Babatola', // Should find Olutimehin Babatola
+      'Olutimehin Babatola', // Should find by real name
+      'Moses', // Should find by nickname only
+    ];
+    
+    console.log('🔍 Testing nickname matching:');
+    testCases.forEach(testName => {
+      const match = findPersonByEnhancedName(testName, nameLookup);
+      if (match) {
+        console.log(`✅ "${testName}" → ${match.member.firstName} ${match.member.lastName} (nickname: ${match.member.nickname || 'none'}, match type: ${match.matchType})`);
+      } else {
+        console.log(`❌ "${testName}" → No match found`);
+      }
+    });
+    
+    // Show all people with nicknames
+    console.log('\n📝 All people with nicknames in export:');
+    exportData.activeMembers
+      .filter(m => m.nickname && m.nickname.trim())
+      .forEach(member => {
+        console.log(`   ${member.firstName} ${member.lastName} → "${member.nickname}"`);
+      });
+    
+  } catch (error) {
+    console.error('❌ Nickname test failed:', error.message);
+  }
+}
+
+/**
  * Debug functions to test family logic step by step
  */
 
