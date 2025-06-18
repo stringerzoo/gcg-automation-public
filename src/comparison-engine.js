@@ -126,25 +126,32 @@ function getCurrentNotInGCGMembers(ss) {
  * Calculate family representatives for "Not in GCG" using priority logic
  * @param {Object} exportData - Full export data
  * @returns {Array} Family representatives who should be in "Not in GCG"
+ * Enhanced Calculate family representatives with Elders and Tuesday School exclusions
  */
 function calculateFamilyRepresentatives(exportData) {
-  console.log('👨‍👩‍👧‍👦 Calculating family representatives...');
+  console.log('👨‍👩‍👧‍👦 Calculating family representatives with exclusions...');
   
-  // Get active members not in GCGs
+  // Get people who should be excluded from "Not in GCG" analysis
+  const excludedPersonIds = getExcludedPersonIds(exportData);
+  console.log(`🚫 Found ${excludedPersonIds.size} people to exclude (Elders + Tuesday School)`);
+  
+  // Get active members not in GCGs, excluding Elders and Tuesday School
   const notInGCGCandidates = exportData.membersWithGCGStatus.filter(m => 
-    !m.gcgStatus.inGroup && m.isActiveMember && !m.isSynthetic
+    !m.gcgStatus.inGroup && 
+    m.isActiveMember && 
+    !m.isSynthetic &&
+    !excludedPersonIds.has(m.personId) // NEW: Exclude Elders and Tuesday School
   );
   
-  console.log(`📋 Found ${notInGCGCandidates.length} active members not in GCGs`);
+  console.log(`📋 Found ${notInGCGCandidates.length} active members not in GCGs (after exclusions)`);
   
   // Group by Family ID
   const familyGroups = new Map();
   const individualsWithoutFamily = [];
   
   notInGCGCandidates.forEach(person => {
-    // Note: These fields come from the Active Members export
-    const familyId = person.familyId || person.family; // Handle different field names
-    const familyRole = person.familyRole || person.family_role; // Handle different field names
+    const familyId = person.familyId || person.family;
+    const familyRole = person.familyRole || person.family_role;
     
     if (familyId && familyId !== 'null' && familyId !== '') {
       if (!familyGroups.has(familyId)) {
@@ -156,7 +163,6 @@ function calculateFamilyRepresentatives(exportData) {
         familyRole: familyRole
       });
     } else {
-      // Individual without family
       individualsWithoutFamily.push({
         ...person,
         familyId: null,
@@ -180,9 +186,37 @@ function calculateFamilyRepresentatives(exportData) {
   // Add individuals without families
   representatives.push(...individualsWithoutFamily);
   
-  console.log(`✅ Selected ${representatives.length} family representatives`);
+  console.log(`✅ Selected ${representatives.length} family representatives (after exclusions)`);
   
   return representatives;
+}
+
+/**
+ * NEW FUNCTION: Get Person IDs of people who should be excluded from "Not in GCG" analysis
+ * @param {Object} exportData - Full export data with GCG assignments
+ * @returns {Set} Set of Person IDs to exclude
+ */
+function getExcludedPersonIds(exportData) {
+  const excludedIds = new Set();
+  
+  // Find Elders and Tuesday School members from the assignments
+  Object.entries(exportData.assignments).forEach(([personId, assignment]) => {
+    const groupName = assignment.groupName.toLowerCase();
+    
+    // Exclude Elders
+    if (groupName.includes('elder')) {
+      excludedIds.add(personId);
+      console.log(`🚫 Excluding Elder: ${personId} (${assignment.groupName})`);
+    }
+    
+    // Exclude Tuesday School
+    if (groupName.includes('tuesday school')) {
+      excludedIds.add(personId);
+      console.log(`🚫 Excluding Tuesday School: ${personId} (${assignment.groupName})`);
+    }
+  });
+  
+  return excludedIds;
 }
 
 /**
