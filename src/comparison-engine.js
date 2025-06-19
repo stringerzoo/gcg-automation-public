@@ -847,7 +847,7 @@ function fixedCompareWithInactiveFiltering(exportData) {
     console.log(`📊 Filtered: ${allCurrentMembers.length} → ${activeCurrentMembers.length} (removed ${allCurrentMembers.length - activeCurrentMembers.length} inactive)`);
     
     // Get export data - filter out people marked as inactive in current sheet
-    const exportMembers = exportData.membersWithGCGStatus.filter(m => {
+    const exportMembers = exportData.activeMembers.filter(m => {
       if (!m.gcgStatus.inGroup) return false;
       
       // Check if this person is marked inactive in our current sheet
@@ -1809,4 +1809,27 @@ function testPhase3() {
   console.log('📋 Inactive processing stats:', comparisonData.inactiveProcessing);
   
   return comparisonData;
+}
+
+/**
+ * Debug active members to see what properties the active members have
+ */
+
+function debugActiveMemberProperties() {
+  const exportData = parseRealGCGDataWithInactiveMembers();
+  
+  console.log('🔍 Checking active member properties...');
+  
+  if (exportData.activeMembers && exportData.activeMembers.length > 0) {
+    const firstMember = exportData.activeMembers[0];
+    console.log('📋 First active member properties:', Object.keys(firstMember));
+    console.log('🎯 Sample member:', JSON.stringify(firstMember, null, 2));
+    
+    // Check if gcgStatus exists
+    if (firstMember.gcgStatus) {
+      console.log('✅ gcgStatus property exists!');
+    } else {
+      console.log('❌ gcgStatus property missing');
+    }
+  }
 }
