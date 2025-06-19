@@ -227,3 +227,30 @@ function parseRealGCGDataWithInactiveMembers() {
     throw error;
   }
 }
+
+function debugInactiveFileDetection() {
+  const config = getConfig();
+  console.log('Config FILE_PATTERNS:', JSON.stringify(config.FILE_PATTERNS));
+  
+  const folder = DriveApp.getFolderById(config.DRIVE_FOLDER_ID);
+  const files = folder.getFiles();
+  
+  console.log('All files in folder:');
+  while (files.hasNext()) {
+    const file = files.next();
+    console.log(`- ${file.getName()}`);
+    
+    // Test the inactive pattern specifically
+    if (file.getName().toLowerCase().includes('immanuelky-people-inactive')) {
+      console.log(`  ✅ This file SHOULD match inactive pattern!`);
+    }
+  }
+  
+  // Try to find the inactive file directly
+  try {
+    const inactiveFile = findLatestFile('INACTIVE_MEMBERS');
+    console.log(`✅ Found inactive file: ${inactiveFile.getName()}`);
+  } catch (error) {
+    console.log(`❌ Error finding inactive file: ${error.message}`);
+  }
+}
