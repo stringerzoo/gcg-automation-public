@@ -270,6 +270,19 @@ function calculateFamilyRepresentatives(exportData) {
   
   return representatives;
 }
+
+/**
+ * Calculate how many inactive members were filtered out of "Not in GCG"
+ * @param {Object} exportData - Full export data
+ * @returns {number} Count of inactive members not in GCGs
+ */
+function calculateInactiveFilteredCount(exportData) {
+  return exportData.inactiveMembers.filter(member => {
+    const gcgAssignment = exportData.assignments[member.personId];
+    return !gcgAssignment; // Inactive and not in GCG
+  }).length;
+}
+
 /**
  * NEW FUNCTION: Get Person IDs of people who should be excluded from "Not in GCG" analysis
  * @param {Object} exportData - Full export data with GCG assignments
