@@ -1790,3 +1790,23 @@ function debugExclusions() {
     throw error;
   }
 }
+
+/**
+ * Test inactive member enhancement Phase 3
+ */
+
+function testPhase3() {
+  // Get the data from Phase 2
+  const exportData = parseRealGCGDataWithInactiveMembers();
+  
+  // Test the Phase 3 enhanced comparison
+  const comparisonData = enhancedCompareWithInactiveAwareness(exportData);
+  
+  console.log('📊 PHASE 3 TEST RESULTS:');
+  console.log(`🔄 GCG Member changes: ${comparisonData.additions?.length || 0} additions, ${comparisonData.updates?.length || 0} updates, ${comparisonData.removals?.length || 0} removals`);
+  console.log(`👥 Not in GCG changes: ${comparisonData.notInGCGChanges?.additions?.length || 0} additions, ${comparisonData.notInGCGChanges?.deletions?.length || 0} deletions`);
+  console.log(`⚠️ NEW inactive members in GCGs: ${comparisonData.newInactiveInGCGs?.length || 0}`);
+  console.log('📋 Inactive processing stats:', comparisonData.inactiveProcessing);
+  
+  return comparisonData;
+}
