@@ -1226,6 +1226,102 @@ function testNicknameMatching() {
 }
 
 /**
+ * Enhanced comparison with inactive member awareness
+ * @param {Object} exportData - Full export data including inactive members
+ * @returns {Object} Changes needed with inactive-aware processing
+ */
+function enhancedCompareWithInactiveAwareness(exportData) {
+  console.log('🔍 Enhanced comparison with inactive awareness...');
+  
+  try {
+    // Get standard GCG member changes (active members only)
+    const gcgChanges = fixedCompareWithInactiveFiltering(exportData);
+    
+    // Calculate enhanced "Not in GCG" changes with inactive filtering
+    const notInGCGChanges = calculateNotInGCGChangesWithInactiveFiltering(exportData);
+    
+    // Find inactive members currently in GCGs (should be cleaned up)
+    const inactiveInGCGs = findInactiveMembersInGCGs(exportData);
+    
+    console.log('\n📊 INACTIVE-AWARE COMPARISON RESULTS:');
+    console.log(`🔄 GCG Member changes (active only): ${gcgChanges.additions.length + gcgChanges.updates.length + gcgChanges.removals.length}`);
+    console.log(`👥 Not in GCG changes (filtered): ${notInGCGChanges.additions.length + notInGCGChanges.deletions.length}`);
+    console.log(`⚠️ Inactive members in GCGs: ${inactiveInGCGs.length}`);
+    
+    return {
+      ...gcgChanges,
+      notInGCGChanges: notInGCGChanges,
+      inactiveInGCGs: inactiveInGCGs,
+      inactiveProcessing: {
+        totalInactiveMembers: exportData.summary.totalInactiveMembers,
+        inactiveMembersInGCG: exportData.summary.inactiveMembersInGCG,
+        inactiveFilteredFromNotInGCG: calculateInactiveFilteredCount(exportData)
+      }
+    };
+    
+  } catch (error) {
+    console.error('❌ Enhanced inactive comparison failed:', error.message);
+    throw error;
+  }
+}
+
+/**
+ * Find inactive members currently in GCGs
+ * @param {Object} exportData - Full export data
+ * @returns {Array} Inactive members with GCG assignments
+ */
+function findInactiveMembersInGCGs(exportData) {
+  return exportData.inactiveMembers.filter(member => {
+    const assignment = exportData.assignments[member.personId];
+    return assignment; // Has GCG assignment
+  }).map(member => ({
+    ...member,
+    gcgAssignment: exportData.assignments[member.personId]
+  }));
+}
+
+/**
+ * Enhanced "Not in GCG" calculation that filters out inactive members
+ * @param {Object} exportData - Full export data
+ * @returns {Object} Changes needed for "Not in GCG" section
+ */
+function calculateNotInGCGChangesWithInactiveFiltering(exportData) {
+  // Get people not in GCGs from ACTIVE members only (exclude inactive)
+  const activeNotInGCG = exportData.activeMembers.filter(member => {
+    const gcgAssignment = exportData.assignments[member.personId];
+    return !gcgAssignment; // Not in any GCG
+  });
+  
+  // Apply family grouping logic to active members only
+  const familyGroupedResults = applyFamilyGroupingLogic(activeNotInGCG);
+  
+  // Get current "Not in GCG" from sheet
+  const config = getConfig();
+  const ss = SpreadsheetApp.openById(config.SHEET_ID);
+  const currentNotInGCG = getNotInGCGMembers(ss);
+  
+  // Calculate changes (inactive members automatically excluded)
+  const additions = familyGroupedResults.filter(person => 
+    !currentNotInGCG.some(current => current.personId === person.personId)
+  );
+  
+  const deletions = currentNotInGCG.filter(current => {
+    // Remove if: 1) Now in GCG, 2) No longer active, or 3) Now inactive
+    const inGCG = exportData.assignments[current.personId];
+    const stillActive = exportData.activeMembers.some(active => active.personId === current.personId);
+    const nowInactive = exportData.inactiveMembers.some(inactive => inactive.personId === current.personId);
+    
+    return inGCG || !stillActive || nowInactive;
+  });
+  
+  return {
+    additions: additions,
+    deletions: deletions,
+    inactiveFilteredCount: exportData.inactiveMembers.filter(m => !exportData.assignments[m.personId]).length
+  };
+}
+
+/**
  * Debug functions to test family logic step by step
  */
 
