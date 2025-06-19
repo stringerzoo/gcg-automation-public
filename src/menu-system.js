@@ -283,7 +283,7 @@ function performHealthCheck() {
       results.details += `❌ Google Sheet access failed: ${error.message}\n`;
     }
     
-    // Test 4: Export Files
+// Test 4: Export Files (including inactive members)
     if (results.driveAccess) {
       try {
         const activeMembersFile = findLatestFile('ACTIVE_MEMBERS');
@@ -292,6 +292,16 @@ function performHealthCheck() {
         results.details += `✅ Export files found:\n`;
         results.details += `   • Active Members: ${activeMembersFile.getName()}\n`;
         results.details += `   • Tags: ${tagsFile.getName()}\n`;
+        
+        // Test for inactive members file (optional)
+        try {
+          const inactiveMembersFile = findLatestFile('INACTIVE_MEMBERS');
+          results.details += `   • Inactive Members: ${inactiveMembersFile.getName()}\n`;
+        } catch (error) {
+          results.details += `   ⚠️ Inactive members file not found (optional)\n`;
+          results.details += `     → System will work without inactive file\n`;
+        }
+        
       } catch (error) {
         results.issues++;
         results.criticalIssues++;
@@ -302,7 +312,7 @@ function performHealthCheck() {
     // Test 5: Data Parsing with Clean Statistics
     if (results.filesFound) {
       try {
-        const exportData = parseRealGCGDataWithGCGMembers();
+        const exportData = parseRealGCGDataWithInactiveMembers();
         results.dataParsing = true;
         results.details += `✅ Data parsing successful:\n`;
         results.details += `   • ${exportData.summary.originalActiveMembers} active members\n`;
