@@ -345,3 +345,101 @@ function findColumnIndex(headers, searchName) {
   }
   return -1;
 }
+
+/**
+ * Parse Inactive Members Google Sheet  
+ * @param {GoogleAppsScript.Drive.File} file - Google Sheets file
+ * @returns {Object} Parsed inactive members data
+ */
+function parseInactiveMembersSheet(file) {
+  console.log('📊 Parsing Inactive Members Google Sheet...');
+  
+  try {
+    const spreadsheet = SpreadsheetApp.openById(file.getId());
+    const sheets = spreadsheet.getSheets();
+    
+    console.log(`📄 Sheet: ${spreadsheet.getName()}`);
+    console.log(`📝 Found ${sheets.length} tabs: ${sheets.map(s => s.getName()).join(', ')}`);
+    
+    const dataSheet = sheets[0];
+    const data = dataSheet.getDataRange().getValues();
+    
+    if (data.length === 0) {
+      throw new Error('No data found in Inactive Members sheet');
+    }
+    
+    // First row should be headers
+    const headers = data[0];
+    console.log(`📋 Headers: ${headers.slice(0, 8).join(', ')}... (showing first 8)`);
+    
+    // Find important column indices
+    const columnMap = {
+      personId: findColumnIndex(headers, 'Breeze ID'),
+      firstName: findColumnIndex(headers, 'First Name'),
+      lastName: findColumnIndex(headers, 'Last Name'),
+      nickname: findColumnIndex(headers, 'Nickname'),
+      streetAddress: findColumnIndex(headers, 'Street Address'),
+      city: findColumnIndex(headers, 'City'),
+      state: findColumnIndex(headers, 'State'),
+      zip: findColumnIndex(headers, 'Zip'),
+      inactiveReason: findColumnIndex(headers, 'Status') // or 'Inactive Reason'
+    };
+    
+    // Validate required columns
+    if (columnMap.personId === -1 || columnMap.firstName === -1 || columnMap.lastName === -1) {
+      throw new Error('Required columns (Breeze ID, First Name, Last Name) not found');
+    }
+    
+    console.log('🔍 Column mapping:', JSON.stringify(columnMap));
+    
+    // Process inactive member data
+    const members = [];
+    let nicknameCount = 0;
+    
+    for (let i = 1; i < data.length; i++) {
+      const row = data[i];
+      
+      // Skip empty rows
+      if (!row[columnMap.personId]) continue;
+      
+      const nickname = columnMap.nickname >= 0 ? (row[columnMap.nickname] || '') : '';
+      if (nickname.trim()) nicknameCount++;
+      
+      const member = {
+        personId: String(row[columnMap.personId]),
+        firstName: row[columnMap.firstName] || '',
+        lastName: row[columnMap.lastName] || '',
+        nickname: nickname,
+        fullName: `${row[columnMap.firstName] || ''} ${row[columnMap.lastName] || ''}`.trim(),
+        address: {
+          street: row[columnMap.streetAddress] || '',
+          city: row[columnMap.city] || '',
+          state: row[columnMap.state] || '',
+          zip: row[columnMap.zip] || ''
+        },
+        isActiveMember: false,  // 🆕 Mark as inactive
+        isInactiveMember: true, // 🆕 Explicit inactive flag
+        inactiveReason: columnMap.inactiveReason >= 0 ? (row[columnMap.inactiveReason] || 'Unknown') : 'Unknown',
+        sourceRow: i + 1
+      };
+      
+      members.push(member);
+    }
+    
+    console.log(`✅ Parsed ${members.length} inactive members`);
+    console.log(`📝 Found ${nicknameCount} inactive members with nicknames`);
+    
+    return {
+      members: members,
+      totalCount: members.length,
+      nicknameCount: nicknameCount,
+      headers: headers,
+      sheetName: dataSheet.getName(),
+      lastUpdated: file.getLastUpdated()
+    };
+    
+  } catch (error) {
+    console.error('❌ Error parsing Inactive Members sheet:', error.message);
+    throw error;
+  }
+}
