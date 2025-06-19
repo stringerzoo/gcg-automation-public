@@ -221,20 +221,19 @@ function buildEnhancedStatsReport(sheet, exportData, changes) {
   sheet.getRange(7, 1).setFontWeight('bold').setFontSize(12);
   
   // ENHANCED: Add inactive member statistics to rows 7-9
-  if (changes.inactiveProcessing) {
-    const stats = changes.inactiveProcessing;
-    sheet.getRange(7, 1).setValue(`Total Active Members: ${exportData.summary?.totalActiveMembers || 0}`);
-    sheet.getRange(8, 1).setValue(`Total Inactive Members: ${stats.totalInactiveMembers || 0}`);
-    sheet.getRange(9, 1).setValue(`Inactive Members in GCGs: ${stats.inactiveMembersInGCG || 0} (${stats.alreadyKnownInactive || 0} already flagged + ${stats.newlyDiscoveredInactive || 0} new)`);
-    sheet.getRange(10, 1).setValue(`Inactive Filtered from "Not in GCG": ${stats.inactiveFilteredFromNotInGCG || 0}`);
-  } else {
-    // Fallback to basic statistics
-    sheet.getRange(7, 1).setValue(`Total Active Members: ${exportData.summary?.totalActiveMembers || 0}`);
-    sheet.getRange(8, 1).setValue(`Total GCG Groups: ${exportData.summary?.totalGroups || 0}`);
-    sheet.getRange(9, 1).setValue(`Active Members in GCGs: ${exportData.summary?.activeMembersInGCG || 0}`);
-  }
+if (changes.inactiveProcessing) {
+  const stats = changes.inactiveProcessing;
+  sheet.getRange(7, 1).setValue(`Total Active Members: ${exportData.summary?.totalActiveMembers || 0}`);
+  sheet.getRange(8, 1).setValue(`Total Inactive Members: ${stats.totalInactiveMembers || 0}`);
+  sheet.getRange(9, 1).setValue(`Inactive Members in GCGs: ${stats.inactiveMembersInGCG || 0} (${stats.alreadyKnownInactive || 0} already flagged + ${stats.newlyDiscoveredInactive || 0} new)`);
+  sheet.getRange(10, 1).setValue(`Inactive Filtered from "Not in GCG": ${stats.inactiveFilteredFromNotInGCG || 0}`);
+} else {
+  // Fallback to basic statistics
+  sheet.getRange(7, 1).setValue(`Total Active Members: ${exportData.summary?.totalActiveMembers || 0}`);
+  sheet.getRange(8, 1).setValue(`Total GCG Groups: ${exportData.summary?.totalGroups || 0}`);
+  sheet.getRange(9, 1).setValue(`Active Members in GCGs: ${exportData.summary?.activeMembersInGCG || 0}`);
+  sheet.getRange(10, 1).setValue('Inactive member data not available');
 }
-
 /**
  * Build "Not in GCG" Report (Section 4)
  */
@@ -320,8 +319,7 @@ function buildInactiveMembersInGCGsReport(sheet, exportData, changes) {
   currentRow++;
   
   // Check if there are newly discovered inactive members in GCGs
-  if (changes.newInactiveInGCGs && changes.newInactiveInGCGs.length > 0) {
-    // Column headers
+  if (changes.newInactiveInGCGs && Array.isArray(changes.newInactiveInGCGs) && changes.newInactiveInGCGs.length > 0) {    // Column headers
     sheet.getRange(currentRow, 6).setValue('Person ID');
     sheet.getRange(currentRow, 7).setValue('First Name');
     sheet.getRange(currentRow, 8).setValue('Last Name');
@@ -462,4 +460,15 @@ function formatPreviewSheet(sheet) {
   if (lastRow > 0 && lastCol > 0) {
     sheet.getRange(1, 1, lastRow, lastCol).setBorder(true, true, true, true, true, true);
   }
+}
+
+function debugChangesObject() {
+  const exportData = parseRealGCGDataWithInactiveMembers();
+  const changes = enhancedCompareWithInactiveAwareness(exportData);
+  
+  console.log('🔍 Changes object structure:');
+  console.log('Keys:', Object.keys(changes));
+  console.log('newInactiveInGCGs:', typeof changes.newInactiveInGCGs, changes.newInactiveInGCGs);
+  console.log('inactiveProcessing:', typeof changes.inactiveProcessing, changes.inactiveProcessing);
+  console.log('notInGCGChanges:', typeof changes.notInGCGChanges, changes.notInGCGChanges);
 }
