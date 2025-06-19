@@ -296,127 +296,101 @@ function calculateNotInGCGChangesWithInactiveFiltering(exportData) {
 ### Phase 4: Preview Report Enhancement  
 **File:** `preview-report.js`
 
-**Add inactive member sections to preview report:**
+**Modify the existing preview report generation to include inactive member insights:**
+
 ```javascript
 /**
- * Enhanced preview report with inactive member insights
- * @param {Object} comparisonData - Comparison results with inactive data
- * @returns {GoogleAppsScript.Spreadsheet.Spreadsheet} Preview report
+ * Enhanced preview report with inactive member insights integrated into Report Sheet
+ * Update the existing generatePreviewReport() function to include these enhancements
  */
-function generateEnhancedPreviewReport(comparisonData) {
-  console.log('📊 Generating enhanced preview report with inactive insights...');
+
+// 1. UPDATE SECTION 3 (Statistics) - Add inactive member statistics
+// Modify the existing statistics section to include inactive stats in rows 7-9
+
+function addInactiveStatsToSection3(sheet, comparisonData) {
+  const stats = comparisonData.inactiveProcessing || {};
   
-  // Create or get preview report spreadsheet (existing logic)
-  const reportSS = createOrUpdatePreviewReport();
-  
-  // Add new "Inactive Summary" sheet
-  addInactiveSummarySheet(reportSS, comparisonData);
-  
-  // Enhance existing GCG Groups sheet with inactive columns
-  enhanceGCGGroupsSheetWithInactive(reportSS, comparisonData);
-  
-  // Enhance "Not in GCG" sheet with filtering explanation
-  enhanceNotInGCGSheetWithFiltering(reportSS, comparisonData);
-  
-  console.log('✅ Enhanced preview report generated');
-  return reportSS;
+  // Add inactive statistics to existing Section 3 (rows 7-9)
+  sheet.getRange(7, 1).setValue(`Total Inactive Members: ${stats.totalInactiveMembers || 0}`);
+  sheet.getRange(8, 1).setValue(`Inactive Members in GCGs: ${stats.inactiveMembersInGCG || 0}`);
+  sheet.getRange(9, 1).setValue(`Inactive Filtered from "Not in GCG": ${stats.inactiveFilteredFromNotInGCG || 0}`);
 }
 
-/**
- * Add new "Inactive Summary" sheet
- */
-function addInactiveSummarySheet(reportSS, comparisonData) {
-  let sheet;
-  try {
-    sheet = reportSS.getSheetByName('Inactive Summary');
-    sheet.clear();
-  } catch (error) {
-    sheet = reportSS.insertSheet('Inactive Summary');
-  }
+// 2. ADD NEW SECTION 5 - Inactive Members Still in GCGs
+// Insert this BEFORE the current Section 5 (Data Inconsistencies)
+
+function addSection5InactiveMembersInGCGs(sheet, comparisonData, startRow) {
+  let currentRow = startRow;
   
-  let currentRow = 1;
-  
-  // Header
-  sheet.getRange(currentRow, 1).setValue('Inactive Member Analysis');
-  sheet.getRange(currentRow, 1).setFontWeight('bold').setFontSize(14);
-  currentRow += 2;
-  
-  // Statistics
-  sheet.getRange(currentRow, 1).setValue('📊 Inactive Member Statistics');
-  sheet.getRange(currentRow, 1).setFontWeight('bold');
+  // Section 5 Header - Light orange background like other warning sections
+  sheet.getRange(currentRow, 6, 1, 5).setValue('Section 5: Inactive Members Still in GCGs (Recommended for Removal)');
+  sheet.getRange(currentRow, 6, 1, 5).setFontWeight('bold').setBackground('#ffe0b3'); // Light orange
   currentRow++;
   
-  const stats = comparisonData.inactiveProcessing || {};
-  sheet.getRange(currentRow, 1).setValue(`Total Inactive Members: ${stats.totalInactiveMembers || 0}`);
-  currentRow++;
-  sheet.getRange(currentRow, 1).setValue(`Inactive Members in GCGs: ${stats.inactiveMembersInGCG || 0}`);
-  currentRow++;
-  sheet.getRange(currentRow, 1).setValue(`Inactive Filtered from "Not in GCG": ${stats.inactiveFilteredFromNotInGCG || 0}`);
-  currentRow += 2;
-  
-  // Inactive members currently in GCGs (need cleanup)
+  // Check if there are inactive members in GCGs
   if (comparisonData.inactiveInGCGs && comparisonData.inactiveInGCGs.length > 0) {
-    sheet.getRange(currentRow, 1).setValue('⚠️ Inactive Members Still in GCGs (Recommended for Removal)');
-    sheet.getRange(currentRow, 1).setFontWeight('bold').setBackground('#ffe0b3');
+    // Column headers
+    sheet.getRange(currentRow, 6).setValue('Person ID');
+    sheet.getRange(currentRow, 7).setValue('First Name');
+    sheet.getRange(currentRow, 8).setValue('Last Name');
+    sheet.getRange(currentRow, 9).setValue('GCG Group');
+    sheet.getRange(currentRow, 10).setValue('Inactive Reason');
+    sheet.getRange(currentRow, 6, 1, 5).setFontWeight('bold');
     currentRow++;
     
-    // Headers
-    sheet.getRange(currentRow, 1).setValue('Person ID');
-    sheet.getRange(currentRow, 2).setValue('First Name');
-    sheet.getRange(currentRow, 3).setValue('Last Name');
-    sheet.getRange(currentRow, 4).setValue('GCG Group');
-    sheet.getRange(currentRow, 5).setValue('Inactive Reason');
-    sheet.getRange(currentRow, 1, 1, 5).setFontWeight('bold');
-    currentRow++;
-    
+    // Data rows
     comparisonData.inactiveInGCGs.forEach(member => {
-      sheet.getRange(currentRow, 1).setValue(member.personId);
-      sheet.getRange(currentRow, 2).setValue(member.firstName);
-      sheet.getRange(currentRow, 3).setValue(member.lastName);
-      sheet.getRange(currentRow, 4).setValue(member.gcgAssignment.groupName);
-      sheet.getRange(currentRow, 5).setValue(member.inactiveReason || 'Unknown');
+      sheet.getRange(currentRow, 6).setValue(member.personId);
+      sheet.getRange(currentRow, 7).setValue(member.firstName);
+      sheet.getRange(currentRow, 8).setValue(member.lastName);
+      sheet.getRange(currentRow, 9).setValue(member.gcgAssignment.groupName);
+      sheet.getRange(currentRow, 10).setValue(member.inactiveReason || 'Unknown');
       currentRow++;
     });
   } else {
-    sheet.getRange(currentRow, 1).setValue('✅ No inactive members found in GCGs');
+    // No inactive members in GCGs
+    sheet.getRange(currentRow, 6).setValue('✅ No inactive members found in GCGs - no cleanup needed');
     currentRow++;
   }
+  
+  // Return the next available row (with buffer)
+  return currentRow + 1; // +1 for buffer row
 }
 
+// 3. UPDATE THE MAIN PREVIEW REPORT FUNCTION
+// Modify your existing generatePreviewReport function to call these new functions
+
 /**
- * Enhance existing GCG Groups sheet with inactive count column
+ * Enhanced preview report generation - UPDATE YOUR EXISTING FUNCTION
+ * Add these calls to your existing generatePreviewReport() function:
  */
-function enhanceGCGGroupsSheetWithInactive(reportSS, comparisonData) {
-  try {
-    const sheet = reportSS.getSheetByName('GCG Groups');
-    if (!sheet) return;
-    
-    // Add "Inactive Count" column header (assuming it's column E)
-    sheet.getRange(1, 5).setValue('Inactive Count');
-    sheet.getRange(1, 5).setFontWeight('bold');
-    
-    // Add inactive counts for each group
-    const groups = comparisonData.groups || [];
-    const inactiveMembers = comparisonData.inactiveInGCGs || [];
-    
-    groups.forEach((group, index) => {
-      const row = index + 2; // Assuming data starts at row 2
-      const inactiveInThisGroup = inactiveMembers.filter(member => 
-        member.gcgAssignment.groupName === group.displayName
-      ).length;
-      
-      sheet.getRange(row, 5).setValue(inactiveInThisGroup);
-      
-      // Color-code if inactive members present
-      if (inactiveInThisGroup > 0) {
-        sheet.getRange(row, 5).setBackground('#ffe0b3'); // Light orange
-      }
-    });
-    
-  } catch (error) {
-    console.warn('⚠️ Could not enhance GCG Groups sheet:', error.message);
+function enhanceExistingPreviewReport(comparisonData) {
+  // Your existing preview report logic...
+  
+  // After creating the Report sheet and adding Sections 1-3:
+  
+  // 1. Enhance Section 3 with inactive statistics (if inactive data available)
+  if (comparisonData.inactiveProcessing) {
+    addInactiveStatsToSection3(reportSheet, comparisonData);
   }
+  
+  // 2. After Section 4 "Proposed Updates to Active Members Not in a GCG":
+  // Calculate where Section 5 should start (after Section 4 ends + 1 buffer row)
+  const section4EndRow = calculateSection4EndRow(comparisonData); // You'll need to implement this
+  const section5StartRow = section4EndRow + 2; // +1 for buffer, +1 for actual start
+  
+  // 3. Add new Section 5 (Inactive Members in GCGs)
+  const section6StartRow = addSection5InactiveMembersInGCGs(reportSheet, comparisonData, section5StartRow);
+  
+  // 4. Move existing "Data Inconsistencies" to Section 6
+  // Update your existing data inconsistencies logic to start at section6StartRow
+  addSection6DataInconsistencies(reportSheet, comparisonData, section6StartRow);
 }
+
+// 4. GCG GROUPS SHEET ENHANCEMENT - SKIPPED FOR NOW
+// Note: Column D already contains "Inactive count" 
+// Need to clarify what current Column D represents before adding enhancements
+// Focus on Report Sheet integration (Sections 3 and 5) for now
 ```
 
 ### Phase 5: Menu System Update
