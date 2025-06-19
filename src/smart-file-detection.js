@@ -12,16 +12,21 @@ function updateConfigForSmartDetection() {
     SHEET_ID: '1H_bKbWbSTCBJWffd4bbGiRpbxjcxIhq2hb7ICUt1-M0',
     
     FILE_PATTERNS: {
-      ACTIVE_MEMBERS: {
-        contains: 'immanuelky-people',
-        excludes: [],
-        description: 'Active Members Export'
-      },
-      TAGS_EXPORT: {
-        contains: 'immanuelky-tags',
-        excludes: [],
-        description: 'Tags Export'
-      }
+     ACTIVE_MEMBERS: {
+      contains: 'immanuelky-people-active',
+      excludes: [],
+      description: 'Active Members Export'
+     },
+     INACTIVE_MEMBERS: {  // 🆕 NEW
+      contains: 'immanuelky-people-inactive',
+      excludes: [],
+      description: 'Inactive Members Export'
+     },
+     TAGS_EXPORT: {
+      contains: 'immanuelky-tags',
+      excludes: [],
+      description: 'Tags Export'
+     }
     },
     
     FILE_SELECTION: {
@@ -168,6 +173,57 @@ function parseRealGCGDataSmart() {
     
   } catch (error) {
     console.error('❌ Smart data parsing failed:', error.message);
+    throw error;
+  }
+}
+
+/**
+ * Parse full GCG data including inactive members
+ * @returns {Object} Complete dataset with active, inactive, and GCG data
+ */
+function parseRealGCGDataWithInactiveMembers() {
+  console.log('🎯 Parsing FULL GCG data (active + inactive + tags)...');
+  
+  try {
+    // Parse active members
+    const activeMembersFile = findLatestFile('ACTIVE_MEMBERS');
+    const activeMembersResult = parseActiveMembersSheet(activeMembersFile);
+    
+    // Parse inactive members (gracefully handle missing file)
+    let inactiveMembersResult = { members: [], totalCount: 0 };
+    try {
+      const inactiveMembersFile = findLatestFile('INACTIVE_MEMBERS');
+      inactiveMembersResult = parseInactiveMembersSheet(inactiveMembersFile);
+      console.log(`✅ Parsed ${inactiveMembersResult.totalCount} inactive members`);
+    } catch (error) {
+      console.log(`⚠️ No inactive members file found (continuing without): ${error.message}`);
+    }
+    
+    // Parse GCG tags
+    const tagsFile = findLatestFile('TAGS_EXPORT');
+    const tagsResult = parseTagsSheet(tagsFile);
+    
+    // Combine and analyze
+    const allMembers = [...activeMembersResult.members, ...inactiveMembersResult.members];
+    
+    return {
+      activeMembers: activeMembersResult.members,
+      inactiveMembers: inactiveMembersResult.members,
+      allMembers: allMembers,
+      groups: tagsResult.groups,
+      assignments: tagsResult.assignments,
+      summary: {
+        totalActiveMembers: activeMembersResult.totalCount,
+        totalInactiveMembers: inactiveMembersResult.totalCount,
+        totalMembers: allMembers.length,
+        totalGroups: tagsResult.totalGroups,
+        activeMembersInGCG: activeMembersResult.members.filter(m => tagsResult.assignments[m.personId]).length,
+        inactiveMembersInGCG: inactiveMembersResult.members.filter(m => tagsResult.assignments[m.personId]).length
+      }
+    };
+    
+  } catch (error) {
+    console.error('❌ Full data parsing failed:', error.message);
     throw error;
   }
 }
