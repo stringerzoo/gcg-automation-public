@@ -204,20 +204,31 @@ function parseRealGCGDataWithInactiveMembers() {
     const tagsResult = parseTagsSheet(tagsFile);
     
     // Combine and analyze
-    const allMembers = [...activeMembersResult.members, ...inactiveMembersResult.members];
+    const activeMembersWithGCGStatus = activeMembersResult.members.map(member => {
+      const gcgAssignment = tagsResult.assignments[member.personId];
+      return {
+        ...member,
+        gcgStatus: {
+          inGroup: !!gcgAssignment,
+          groupName: gcgAssignment?.groupName || null,
+          leader: gcgAssignment?.leader || null,
+          coLeader: gcgAssignment?.coLeader || null
+        }
+      };
+    });
     
     return {
-      activeMembers: activeMembersResult.members,
+      activeMembers: activeMembersWithGCGStatus, // ← Updated to use enhanced version
       inactiveMembers: inactiveMembersResult.members,
-      allMembers: allMembers,
+      allMembers: [...activeMembersWithGCGStatus, ...inactiveMembersResult.members],
       groups: tagsResult.groups,
       assignments: tagsResult.assignments,
       summary: {
         totalActiveMembers: activeMembersResult.totalCount,
         totalInactiveMembers: inactiveMembersResult.totalCount,
-        totalMembers: allMembers.length,
+        totalMembers: activeMembersWithGCGStatus.length + inactiveMembersResult.totalCount,
         totalGroups: tagsResult.totalGroups,
-        activeMembersInGCG: activeMembersResult.members.filter(m => tagsResult.assignments[m.personId]).length,
+        activeMembersInGCG: activeMembersWithGCGStatus.filter(m => m.gcgStatus.inGroup).length,
         inactiveMembersInGCG: inactiveMembersResult.members.filter(m => tagsResult.assignments[m.personId]).length
       }
     };
