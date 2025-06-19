@@ -1264,7 +1264,7 @@ function enhancedCompareWithInactiveAwareness(exportData) {
     return {
       ...gcgChanges,
       notInGCGChanges: notInGCGChanges,
-      inactiveInGCGs: inactiveInGCGs,
+      newinactiveInGCGs: inactiveInGCGs,
       inactiveProcessing: {
         totalInactiveMembers: exportData.summary.totalInactiveMembers,
         inactiveMembersInGCG: exportData.summary.inactiveMembersInGCG,
