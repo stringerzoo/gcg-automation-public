@@ -1281,44 +1281,20 @@ function findInactiveMembersInGCGs(exportData) {
 }
 
 /**
- * Enhanced "Not in GCG" calculation that filters out inactive members
- * @param {Object} exportData - Full export data
- * @returns {Object} Changes needed for "Not in GCG" section
+ * Simplified "Not in GCG" calculation that calls similar function
  */
+
 function calculateNotInGCGChangesWithInactiveFiltering(exportData) {
-  // Get people not in GCGs from ACTIVE members only (exclude inactive)
-  const activeNotInGCG = exportData.activeMembers.filter(member => {
-    const gcgAssignment = exportData.assignments[member.personId];
-    return !gcgAssignment; // Not in any GCG
-  });
+  console.log('🔍 Calculating Not in GCG changes with inactive filtering...');
   
-  // Apply family grouping logic to active members only
-  const familyGroupedResults = applyFamilyGroupingLogic(activeNotInGCG);
-  
-  // Get current "Not in GCG" from sheet
-  const config = getConfig();
-  const ss = SpreadsheetApp.openById(config.SHEET_ID);
-  const currentNotInGCG = getNotInGCGMembers(ss);
-  
-  // Calculate changes (inactive members automatically excluded)
-  const additions = familyGroupedResults.filter(person => 
-    !currentNotInGCG.some(current => current.personId === person.personId)
-  );
-  
-  const deletions = currentNotInGCG.filter(current => {
-    // Remove if: 1) Now in GCG, 2) No longer active, or 3) Now inactive
-    const inGCG = exportData.assignments[current.personId];
-    const stillActive = exportData.activeMembers.some(active => active.personId === current.personId);
-    const nowInactive = exportData.inactiveMembers.some(inactive => inactive.personId === current.personId);
-    
-    return inGCG || !stillActive || nowInactive;
-  });
-  
-  return {
-    additions: additions,
-    deletions: deletions,
-    inactiveFilteredCount: exportData.inactiveMembers.filter(m => !exportData.assignments[m.personId]).length
+  // Create filtered export data with only active members
+  const activeOnlyExportData = {
+    ...exportData,
+    membersWithGCGStatus: exportData.activeMembers  // Only active members
   };
+  
+  // Use existing family logic function (it already works!)
+  return calculateNotInGCGChangesWithFamilyLogic(activeOnlyExportData);
 }
 
 /**
